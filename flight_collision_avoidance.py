@@ -8,7 +8,6 @@ import datetime
 import numpy
 
 username = 'fortmcas'
-apiKey = '113dbde052d45892c914639637c8a6a41913ba6e'
 url = 'http://flightxml.flightaware.com/soap/FlightXML2/wsdl'
 
 logging.basicConfig(level=logging.INFO)
