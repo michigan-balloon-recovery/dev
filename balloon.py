@@ -910,6 +910,120 @@ def get_wind(RapData,altitude):
 
     return (ve,vn)
 
+def getPositions(vz, lat, lon, alt, airspeed, head, querytime):
+    #Inputs:
+    #vz: vertical speed (ascent rate)                                               type: float
+    #lat: current latitude of balloon (radians)                                     type: float
+    #lon: current longitude of balloon (radians)                                    type: float
+    #alt: current altitude (meters above sea level)                                 type: float
+    #airspeed: magnitude of airspeed                                                type: float
+    #head: direction of planar airspeed, degrees positive clockwise from north      type: float
+    #querytime: end of desired time window (seconds)                                type: float
+
+    #Assumptions:
+        # balloon ascends at a constant speed vz, and airspeed has no vertical component
+        # change in latitude is not large enough to affect distance-to-longitude conversion
+        # airspeed is constant in both magnitude and direction throughout the time window
+        # Earth's radius is constant (ground level invariance)
+        # change in height is not large enough to affect distance-to-angle conversion
+
+    #Outputs:
+    #positions: extrapolated positions. Dataframe of lat, lon, with datetime index
+
+    #This function extrapolates the state of the balloon a time ts into the future
+    def nextState(a, ts):
+        # Inputs:
+        # a: previous state: [lat, lon, alt, vx, vy, vz]                     type: float
+        # ts: time step                                                      type: int
+
+        # Assumptions for state function:
+        # airspeed is constant in both magnitude and direction
+        # changes in latitude are not large enough to affect distance-to-longitude conversion
+        # Earth's radius is constant (ground level invariance)
+        # change in height is not large enough to affect distance-to-angle conversion
+
+        # Outputs:
+        # X1: future extrapolated state [lat, lon, alt, vx, vy, vz]          type: float
+        # Implementation:
+
+        # constants
+        R = 6.371 * 10 ** 6  # radius of Earth, meters
+
+        # parse data:
+        lat0 = a[0]  # initial latitude in degrees
+        lon0 = a[1]  # initial longitude in degrees
+        alt = a[2]  # initial altitude in meters above ground level
+        vx = a[3]  # eastward velocity in meters per second
+        vy = a[4]  # northward velocity in meters per second
+        vz = a[5]  # ascent rate in meters per second
+
+        # compute distance traveled in time step
+        dx = vx * ts
+        dy = vy * ts
+        dalt = vz * ts
+
+        # distance-to-angle conversions
+        k_lat = 1 / (R + alt)
+        k_lon = -1 / ((R + alt) * (
+                    1 - lat0 / 90))  # negative because lon increases going WEST, but positive airspeed is EAST
+        dlat = dy * k_lat
+        dlon = dx * k_lon
+
+        # new state
+        X1 = np.zeros((1, 6))
+        X1[0, 0] = lat0 + dlat
+        X1[0, 1] = lon0 + dlon
+        X1[0, 2] = alt + dalt
+        X1[0, 3] = vx
+        X1[0, 4] = vy
+        X1[0, 5] = vz
+        return (X1)
+    #end nextState function
+
+    #preprocessing: decomposing airspeed into vector components
+    head_in_q3 = False
+    head_in_q4 = False
+    if head >= 360:
+        head = head - 360
+
+    #temporarily rotate 180 degrees to get heading in quadrant 1 or 2. This is because sin and cos have domain [0, pi]
+    if 180 <= head < 270:                   #Q3 --> Q1
+        head_in_q3 = True
+        head = head - 180
+    elif 270 <= head < 360:                 #Q4 --> Q2
+        head_in_q4 = True
+        head = head - 180
+
+    head_rad = head*math.pi/180             #conversion to radians
+    vx = airspeed*math.sin(head_rad)        #decomposition into x,y components: +x is East, +y is North
+    vy = airspeed*math.cos(head_rad)        #Note: heading is defined positive clockwise from North
+
+    #if heading was in quadrant 3 or 4, undo the 180 degree rotation
+    if head_in_q3 or head_in_q4:
+        vx = -vx
+        vy = -vy
+
+    #initialization
+    ts = 5                                  #time step = 5 seconds. Can be changed to be a function input
+    t0 = datetime.datetime.now()            #current time
+    numel = int(math.floor(querytime/ts))   #number of extrapolated positions (number of elements --> numel)
+
+    #state space has 6 dimensions: [lat, lon, alt, vx, vy, vz] in that order
+    dims = (numel, 6)
+    states = np.zeros(dims)
+    timestamps = [t0] * numel               #initialize list of type datetime. Will be populated later with timestamps
+
+    #compute states
+    states[0,:] = [lat, lon, alt, vx, vy, vz]   #initial state
+    for i in range(1,numel):                    #extrapolated states
+        states[i,:] = nextState(states[(i-1),:], ts)                        #add next state
+        timestamps[i] = timestamps[i-1] + datetime.timedelta(seconds=ts)    #add next timestamp
+
+    #restructure data, return extrapolated positions dataframe
+    positions = pd.DataFrame({'Time': timestamps, 'Latitude': states[:,0], 'Longitude': states[:,1]})
+    positions.set_index('Time', inplace=True)
+    return positions
+
 
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
