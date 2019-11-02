@@ -95,6 +95,13 @@ FUNCTIONS:
 	- Referenced by other functions
 	- Determine which station(s) is(are) closest to the given latitude and longitude
 
+- get_stations(longitude, latitude, max_distance)
+    - Referenced by other functions
+    - Determine which stations are within max_distance of given latitude and longitude
+
+- get_station_data(stations, args)
+    - Referenced by other functions
+
 - read_rap(file,args,IsNam)
 	- Referenced by other functions
 	- Reads RAP file
@@ -105,17 +112,23 @@ FUNCTIONS:
 - calculate_helium(NumberOfTanks)
 	- Referenced by other functions
 
-- calc_ascent_rate(RapData, NumberOfHelium, args, altitude)
+- calc_ascent_rate(StationData, NumberOfHelium, args, altitude)
 	- Referenced by other functions
 
-- calc_descent_rate(RapData, args, altitude)
+- calc_descent_rate(StationData, args, altitude)
 	- Referenced by other functions
 
 - get_temperature_and_pressure(altitude,RapData)
 	- Referenced by other functions
 
+- get_temperature_and_pressure(altitude,latitude,longitude,StationData)
+    - Referenced by other functions
+
 - get_wind(RapData,altitude)
 	- Referenced by other functions
+
+- get_wind(StationData,altitude,latitude,longitude)
+    - Referenced by other functions
 
 - data = prediction(payload weight,balloon mass,parachute diameter,helium tanks,latitude,longitude,current altitude,status,query time,# of ensembles, error in ensembles, TESTINGtimeDiff)
 	- payload weight        - lbs (float)

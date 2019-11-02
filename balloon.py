@@ -24,6 +24,8 @@ import plotly
 import plotly.graph_objs as go
 import plotly.express as px
 
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF
 
 #-----------------------------------------------------------------------------
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
@@ -374,6 +376,8 @@ def get_args(argv,queryTime,TESTINGtimeDiff):
 
     update = 0
 
+    weather_station_dist = 0.001
+
     for arg in argv:
         m = re.match(r'-callsign=(.*)',arg)
         if m:
@@ -583,7 +587,8 @@ def get_args(argv,queryTime,TESTINGtimeDiff):
             'aprs':UseAprs,
             'currenttime':CurrentTime,
             'launchtime':LaunchTime,
-            'stime':sTimeNow}
+            'stime':sTimeNow,
+            'weather_dist':weather_station_dist}
     return args
 
 #-----------------------------------------------------------------------------
@@ -648,11 +653,67 @@ def get_station(longitude, latitude):
     #print('Done get station '+outfile)
     return (outfile,IsNam,SaveLat,SaveLon,MinDist)
 
+
+def get_stations(longitude, latitude, max_distance):
+    # read in stations, calculate distance
+    stationData = pd.read_csv(os.getcwd()+'/StationList.txt',delimiter=' ',header=None)
+    stationData[10] = ((stationData[3]-latitude)**2+(stationData[6]-longitude)**2)**0.5
+    stationData[11] = 'US'
+
+    stationDataWorld = pd.read_csv(os.getcwd()+'/StationListWorld.txt',delimiter=' ',header=None)
+    stationDataWorld[10] = ((stationDataWorld[3]-latitude)**2+(stationDataWorld[6]-longitude)**2)**0.5
+    stationDataWorld[11] = 'World'
+
+    StationData = pd.concat([stationData,stationDataWorld])
+    StationData.drop_duplicates(subset=[0],inplace=True)
+    selectedStationData = pd.DataFrame()
+
+    # find stations within distance, increasing distance as needed
+    while selectedStationData.empty:
+        selectedStationData = StationData[StationData[10]<=max_distance]
+        max_distance *= 2
+
+    selectedStationData = selectedStationData.copy()
+
+    selectedStationData.loc[selectedStationData[11]=='US',12] = 'http://www.meteor.iastate.edu/~ckarsten/bufkit/data/nam/nam_'+selectedStationData[0]+'.buf'
+    selectedStationData.loc[selectedStationData[11]=='World',12] = 'ftp://ftp.meteo.psu.edu/pub/bufkit/GFS/latest/gfs3_'+selectedStationData[0]+'.buf'
+
+    if not os.path.exists('rawDataFiles/'):
+        os.makedirs('rawDataFiles/')
+
+    for index in selectedStationData.itertuples():
+        outfile = 'rawDataFiles/'+index[1]+'.txt'
+        if not os.path.isfile(outfile):
+            command = 'curl -o '+outfile+' '+index[13]
+            os.system(command)
+        if (not os.path.isfile(outfile)):
+            print("Error getting data from URL. Check URL for "+str(index[1])+'.')
+
+    return selectedStationData, max_distance
+
+
+# join data for all stations - creates dictionary of readRap dataframes indexed by (lat,lon) pair
+def get_station_data(stations, args):
+    station_data = {}
+    station_data_newtime = {}
+    for index in stations.itertuples():
+        df,date,TimeFound = read_rap('rawDataFiles/'+index[1]+'.txt',args,index[11]!='US')
+        df = pd.DataFrame(df)
+        if not df.empty and TimeFound:
+            station_data[(index[4],index[7])] = df
+        elif not df.empty:
+            station_data_newtime[(index[4],index[7])] = df
+
+    if station_data:
+        return station_data
+    return station_data_newtime
+
 #-----------------------------------------------------------------------------
 # Originally written by Aaron J Ridley - https://github.com/aaronjridley/Balloons
 # Modified by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
 def read_rap(file,args,IsNam):
+    TimeFound = 1
     #print("read_rap")
     
     # Different search criteria depending on which file type is used
@@ -705,6 +766,7 @@ def read_rap(file,args,IsNam):
         print("Could not find requested time! Just using first time in file!")
         fpin.seek(0,0)
         IsDone = 0
+        TimeFound = 0
 
     # Run through line by line, after the line that we found the right time in
     while (IsDone == 0):
@@ -754,7 +816,7 @@ def read_rap(file,args,IsNam):
     data = {'Altitude':altitude, 'Pressure':pressure, 'Temperature':temperature,
             'Veast':ve, 'Vnorth':vn}
     #print('end read rap')        
-    return (data,forcastTime)
+    return (data,forcastTime,TimeFound)
 
 #-----------------------------------------------------------------------------
 # Originally written by Aaron J Ridley - https://github.com/aaronjridley/Balloons
@@ -802,9 +864,9 @@ def calculate_helium(NumberOfTanks):
 # Originally written by Aaron J Ridley - https://github.com/aaronjridley/Balloons
 # Modified by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
-def calc_ascent_rate(RapData, NumberOfHelium, args, altitude):
+def calc_ascent_rate(StationData, NumberOfHelium, args, altitude):
 
-    Temperature,Pressure = get_temperature_and_pressure(altitude,RapData)
+    Temperature,Pressure = get_temperature_and_pressure(altitude,args['latitude'],args['longitude'],StationData)
 
     Volume = NumberOfHelium * Boltzmann * Temperature/Pressure
 
@@ -832,7 +894,7 @@ def calc_ascent_rate(RapData, NumberOfHelium, args, altitude):
         # upward.  This doesn't seem to be the case in real launches.  A more
         # uniform ascent rate is often observed.  Through trial and error, we found
         # that using a corrector as below is good...
-        t,p = get_temperature_and_pressure(1000.0,RapData)
+        t,p = get_temperature_and_pressure(1000,args['latitude'],args['longitude'],StationData)
         v = NumberOfHelium * Boltzmann * t/p
         r = (3.0 * v / (4.0*pi))**(1.0/3.0)
         # This is basically assuming that the first ascent rate is the correct on,
@@ -854,11 +916,11 @@ def calc_ascent_rate(RapData, NumberOfHelium, args, altitude):
 # Originally written by Aaron J Ridley - https://github.com/aaronjridley/Balloons
 # Modified by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
-def calc_descent_rate(RapData, args, altitude):
+def calc_descent_rate(StationData, args, altitude):
 
     Gravity = SurfaceGravity * (EarthRadius/(EarthRadius+altitude))**2
 
-    Temperature,Pressure = get_temperature_and_pressure(altitude,RapData)
+    Temperature,Pressure = get_temperature_and_pressure(altitude,args['latitude'],args['longitude'],StationData)
     MassDensity = MassOfAir * Pressure / (Boltzmann * Temperature)
 
     DescentRate = np.sqrt(2 * args['payload'] * Gravity / (MassDensity * ParachuteDragCoefficient * args['area']));
@@ -887,6 +949,25 @@ def get_temperature_and_pressure(altitude,RapData):
 
     return (temp,pres)
 
+def get_temperature_and_pressure(altitude, latitude, longitude, StationData):
+    X,y_temp,y_pres=[],[],[]
+    for (lat,lon),rapdat in StationData.items():
+        X.append([lat,lon])
+
+        rapdat['Weight'] = abs(rapdat.Altitude-altitude)
+        nclosest = rapdat.nsmallest(4,'Weight')
+
+        y_temp.append((nclosest.Temperature / nclosest.Weight.sum() * nclosest.Weight).sum())
+        y_pres.append((nclosest.Pressure / nclosest.Weight.sum() * nclosest.Weight).sum())
+
+    kernel = RBF(10, (1, 1e2))
+    gpt = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=9, normalize_y=True)
+    gpt.fit(np.array(X),np.array(y_temp))
+
+    gpp = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=9, normalize_y=True)
+    gpp.fit(np.array(X),np.array(y_pres))
+
+    return gpt.predict([[latitude,longitude]])[0],gpp.predict([[latitude,longitude]])[0]
 
 #-----------------------------------------------------------------------------
 # Originally written by Aaron J Ridley - https://github.com/aaronjridley/Balloons
@@ -910,6 +991,25 @@ def get_wind(RapData,altitude):
 
     return (ve,vn)
 
+def get_wind(StationData,altitude,latitude,longitude):
+    X,y_east,y_north=[],[],[]
+    for (lat,lon),rapdat in StationData.items():
+        X.append([lat,lon])
+
+        rapdat['Weight'] = abs(rapdat.Altitude-altitude)
+        nclosest = rapdat.nsmallest(4,'Weight')
+
+        y_east.append((nclosest.Veast / nclosest.Weight.sum() * nclosest.Weight).sum())
+        y_north.append((nclosest.Vnorth / nclosest.Weight.sum() * nclosest.Weight).sum())
+
+    kernel = RBF(10, (1, 1e2))
+    gpe = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=9, normalize_y=True)
+    gpe.fit(np.array(X),np.array(y_east))
+
+    gpn = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=9, normalize_y=True)
+    gpn.fit(np.array(X),np.array(y_north))
+
+    return gpe.predict([[latitude,longitude]])[0],gpn.predict([[latitude,longitude]])[0]
 
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
@@ -974,13 +1074,11 @@ def prediction(payload,balloon,parachute,helium,lat,lon,alt,status,queryTime,nEn
             longitude = args['longitude']
             latitude = args['latitude']
             
-            # Get weather station
-            filename,IsNam,StatLat,StatLon,MinDist = get_station(longitude, latitude)
-            StationLat = [StatLat]
-            StationLon = [StatLon]
+            # Get weather data from stations within given distance
+            stations, max_dist = get_stations(lon,lat,args['weather_dist'])
+            StationData = get_station_data(stations,args)
+            RapData = StationData[list(StationData.keys())[0]]
             
-            # Get weather data from that station
-            RapData,forcastTime = read_rap(filename,args,IsNam)
     
             Diameter = 0.0
             AscentTime = 1.0
@@ -1054,7 +1152,7 @@ def prediction(payload,balloon,parachute,helium,lat,lon,alt,status,queryTime,nEn
                 WindSpeed.append(np.sqrt(Veast*Veast + Vnorth*Vnorth))
                 TotalDistance += np.sqrt(Veast*Veast + Vnorth*Vnorth)*dt*MilesPerMeter
     
-                AscentRate,Diameter = calc_ascent_rate(RapData, NumberOfHelium, args, altitude)
+                AscentRate,Diameter = calc_ascent_rate(StationData, NumberOfHelium, args, altitude)
                 if (altitude < args['hover']):
                     altitude = altitude + AscentRate*dt
     
@@ -1104,7 +1202,7 @@ def prediction(payload,balloon,parachute,helium,lat,lon,alt,status,queryTime,nEn
                 WindSpeed.append(np.sqrt(Veast*Veast + Vnorth*Vnorth))
                 TotalDistance += np.sqrt(Veast*Veast + Vnorth*Vnorth)*dt*MilesPerMeter
     
-                DescentRate = calc_descent_rate(RapData, args, altitude)
+                DescentRate = calc_descent_rate(StationData, args, altitude)
                 altitude = altitude - DescentRate*dt
     
                 DescentLongitude.append(longitude)
@@ -1184,7 +1282,7 @@ def prediction(payload,balloon,parachute,helium,lat,lon,alt,status,queryTime,nEn
                         longitude = longitude + Veast  * DegPerMeter * dt / np.cos(latitude*dtor)
                         latitude  = latitude  + Vnorth * DegPerMeter * dt
         
-                        AscentRate,Diameter = calc_ascent_rate(RapData, NumberOfHeliumPerturbed, args, altitude)
+                        AscentRate,Diameter = calc_ascent_rate(StationData, NumberOfHeliumPerturbed, args, altitude)
         
                         if (altitude < args['hover']):
                             altitude = altitude + AscentRate*dt
@@ -1222,7 +1320,7 @@ def prediction(payload,balloon,parachute,helium,lat,lon,alt,status,queryTime,nEn
                     longitude = longitude + Veast  * DegPerMeter * dt / np.cos(latitude*dtor)
                     latitude  = latitude  + Vnorth * DegPerMeter * dt
     
-                    DescentRate = calc_descent_rate(RapData, args, altitude)
+                    DescentRate = calc_descent_rate(StationData, args, altitude)
                     altitude = altitude - DescentRate*dt
                     
                     AscentTime = AscentTime + dt
@@ -1304,8 +1402,9 @@ def prediction(payload,balloon,parachute,helium,lat,lon,alt,status,queryTime,nEn
     AllData['Landing Lat'] = Latitudes[-1]
     AllData['Landing Lon'] = Longitudes[-1]
     AllData['Landing Time'] = AllData['TimeData'].index[-1] 
-    AllData['StationDist'] = MinDist
+    AllData['StationDist'] = max_dist
     AllData['RapData'] = RapData
+    AllData['StationData'] = StationData
     
     # Store data used for prediction input
     AllData['Inputs'] = dict() 
