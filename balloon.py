@@ -911,8 +911,11 @@ def get_wind(RapData,altitude):
     return (ve,vn)
 
 
+#-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
 
-def getPositions(vz, lat, lon, alt, airspeed, head, querytime):
+
+def extrapPosition(vz, lat, lon, alt, airspeed, head, querytime):
     #Inputs:
     #vz: vertical speed (ascent rate)                                               type: float
     #lat: current latitude of balloon (radians)                                     type: float
@@ -931,56 +934,6 @@ def getPositions(vz, lat, lon, alt, airspeed, head, querytime):
 
     #Outputs:
     #positions: extrapolated positions. Dataframe of lat, lon, with datetime index
-
-    #This function extrapolates the state of the balloon a time ts into the future
-    def nextState(a, ts):
-        # Inputs:
-        # a: previous state: [lat, lon, alt, vx, vy, vz]                     type: float
-        # ts: time step                                                      type: int
-
-        # Assumptions for state function:
-        # airspeed is constant in both magnitude and direction
-        # changes in latitude are not large enough to affect distance-to-longitude conversion
-        # Earth's radius is constant (ground level invariance)
-        # change in height is not large enough to affect distance-to-angle conversion
-
-        # Outputs:
-        # X1: future extrapolated state [lat, lon, alt, vx, vy, vz]          type: float
-        # Implementation:
-
-        # constants
-        R = 6.371 * 10 ** 6  # radius of Earth, meters
-
-        # parse data:
-        lat0 = a[0]  # initial latitude in degrees
-        lon0 = a[1]  # initial longitude in degrees
-        alt = a[2]  # initial altitude in meters above ground level
-        vx = a[3]  # eastward velocity in meters per second
-        vy = a[4]  # northward velocity in meters per second
-        vz = a[5]  # ascent rate in meters per second
-
-        # compute distance traveled in time step
-        dx = vx * ts
-        dy = vy * ts
-        dalt = vz * ts
-
-        # distance-to-angle conversions
-        k_lat = 1 / (R + alt)
-        k_lon = -1 / ((R + alt) * (
-                    1 - lat0 / 90))  # negative because lon increases going WEST, but positive airspeed is EAST
-        dlat = dy * k_lat
-        dlon = dx * k_lon
-
-        # new state
-        X1 = np.zeros((1, 6))
-        X1[0, 0] = lat0 + dlat
-        X1[0, 1] = lon0 + dlon
-        X1[0, 2] = alt + dalt
-        X1[0, 3] = vx
-        X1[0, 4] = vy
-        X1[0, 5] = vz
-        return (X1)
-    #end nextState function
 
     #preprocessing: decomposing airspeed into vector components
     head_in_q3 = False
@@ -1025,6 +978,61 @@ def getPositions(vz, lat, lon, alt, airspeed, head, querytime):
     positions = pd.DataFrame({'Time': timestamps, 'Latitude': states[:,0], 'Longitude': states[:,1]})
     positions.set_index('Time', inplace=True)
     return positions
+
+
+# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+
+
+    #This function extrapolates the state of the balloon a time ts into the future
+    # Called by extrapPosition
+def nextState(a, ts):
+    # Inputs:
+    # a: previous state: [lat, lon, alt, vx, vy, vz]                     type: float
+    # ts: time step                                                      type: int
+
+    # Assumptions for state function:
+    # airspeed is constant in both magnitude and direction
+    # changes in latitude are not large enough to affect distance-to-longitude conversion
+    # Earth's radius is constant (ground level invariance)
+    # change in height is not large enough to affect distance-to-angle conversion
+
+    # Outputs:
+    # X1: future extrapolated state [lat, lon, alt, vx, vy, vz]          type: float
+    # Implementation:
+
+    # constants
+    R = 6.371 * 10 ** 6  # radius of Earth, meters
+
+    # parse data:
+    lat0 = a[0]  # initial latitude in degrees
+    lon0 = a[1]  # initial longitude in degrees
+    alt = a[2]  # initial altitude in meters above ground level
+    vx = a[3]  # eastward velocity in meters per second
+    vy = a[4]  # northward velocity in meters per second
+    vz = a[5]  # ascent rate in meters per second
+
+    # compute distance traveled in time step
+    dx = vx * ts
+    dy = vy * ts
+    dalt = vz * ts
+
+    # distance-to-angle conversions
+    k_lat = 1 / (R + alt)
+    k_lon = -1 / ((R + alt) * (1 - lat0 / 90))  # negative because lon increases going WEST, but positive airspeed is EAST
+    dlat = dy * k_lat
+    dlon = dx * k_lon
+
+    # new state
+    X1 = np.zeros((1, 6))
+    X1[0, 0] = lat0 + dlat
+    X1[0, 1] = lon0 + dlon
+    X1[0, 2] = alt + dalt
+    X1[0, 3] = vx
+    X1[0, 4] = vy
+    X1[0, 5] = vz
+    return (X1)
+#end nextState function
 
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
