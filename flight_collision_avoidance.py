@@ -6,10 +6,12 @@ from suds.client import Client
 import logging
 import datetime
 import numpy
+import pandas as pd
+import pickle
 
 username = 'fortmcas'
 url = 'http://flightxml.flightaware.com/soap/FlightXML2/wsdl'
-
+apiKey = '113dbde052d45892c914639637c8a6a41913ba6e'
 logging.basicConfig(level=logging.INFO)
 api = Client(url, username=username, password=apiKey)
 
@@ -64,12 +66,26 @@ def get_preflight_data(latitude, longitude, max_ceiling, date_time_obj, time_del
     search_string = "{range lat " + min_lat + " " + max_lat + "} {range lon " + min_long + " " + max_long + "}\
     {< alt " + max_ceiling + "} {range clock " + time_window_min + " " + time_window_max +  "}"
     flight_ids = []
-    print search_string
+    print(search_string)
     result = api.service.SearchBirdseyeInFlight(search_string, 200, 0)
     result = result.aircraft
-    track_search_string = ''
-    historical_tracks = []
+    print("results obtained")
+    data = []
     for i in result:
-        historical_tracks.append(api.service.GetHistoricalTrack(i.faFlightID))
-    package(historical_tracks, 'historical_tracks.txt')
-    return historical_tracks
+        try:
+            temp = api.service.GetHistoricalTrack(i.faFlightID)
+            temp_lat = []
+            temp_long = []
+            temp_alt = []
+            temp_time = []
+            for j in temp.data:
+                temp_lat.append(j.latitude)
+                temp_long.append(j.longitude)
+                temp_alt.append(j.altitude)
+                temp_time.append(j.timestamp)
+            temp_data = {'Time':temp_time, 'Latitude':temp_lat, 'Longitude':temp_long, 'Altitude':temp_alt}
+            data.append(temp_data)
+        except:
+            pass
+
+    return data
