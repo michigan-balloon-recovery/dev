@@ -7,10 +7,6 @@ import math
 # User Inputs
 flightID = '13'
 APRScallsign = ''   # APRS Callsign - can be string or list of strings
-APRS_apikey = '42457.M4AFa3hdkXG31'
-slackURL = 'https://hooks.slack.com/services/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'
-messageType = 'channel'          # 'dm' or 'predictions'
-recipient = '#predictions'         # dm format: 'Robby', channel format: '#predictions'
 APRSfreq = 30               # Seconds
 UpperFreqToleraceWarn = 4   # minutes
 UpperFreqToleraceTerm = 6   # minutes
