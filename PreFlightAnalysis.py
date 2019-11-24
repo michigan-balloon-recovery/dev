@@ -19,7 +19,6 @@ tolerace = 10                           # ft - how close the conversion has to g
 ensem = 50;
 ensem_per = 0.3;
 UTCdiff = 5;
-apikey = 'AIzaSyASC--sFv_i9Wq0IH5uMLWRTTS15FLNUAs'
 doDrivingCalc = True
 ######################
 
@@ -49,7 +48,7 @@ if (doDrivingCalc == True):
     print('Driving Time: ' + drivingTime)
     print('Driving Distance: ' + drivingDistance)
 
-balloon.heatMap(data,'AIzaSyAQObil0TIvtyXUf1pMRCLpIBE0pRgyn9M')
+balloon.heatMap(data,'')
 
 
 # Cost function stuff
