@@ -17,6 +17,7 @@ import gmplot
 import statistics
 import pandas as pd
 import subprocess
+from math import sin, cos, sqrt, atan2, radians
 
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -28,10 +29,31 @@ import plotly.express as px
 #-----------------------------------------------------------------------------
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
-def APRS(callsign,APRS_apikey):
+def APRS(callsign_entry,APRS_apikey):
+    # Figure out what variable type "callsign" is and convert them to appropriate type
+    if (isinstance(callsign_entry,str) == True):
+        callsign = callsign_entry
+    if (isinstance(callsign_entry,list) == True):
+        callsign = ",".join(callsign_entry)
+        
+    # Pull data from APRS
     json_response= requests.get("http://api.aprs.fi/api/get?name="+callsign+"&what=loc&apikey="+APRS_apikey+"&format=json")
     aprs_dict = json.loads(json_response.text) 
-    APRS_data = aprs_dict['entries'][0]
+    
+    # If callsign is a string, just take the data from that as output
+    if (isinstance(callsign_entry,str) == True):
+        APRS_data = aprs_dict['entries'][0]
+        
+    # If multiple callsigns are given, find one that has the most recent data and use that for output
+    if (isinstance(callsign_entry,list) == True): 
+        latestTime = 0;
+        for callsign_instance in range(1,len(aprs_dict['entries'])):
+            last_time = int(aprs_dict['entries'][callsign_instance]['lasttime'])
+            if (last_time > latestTime):
+                lastestTime = last_time
+                bestCallsign = callsign_instance;
+        APRS_data = aprs_dict['entries'][bestCallsign]
+        
     return APRS_data
 
 #-----------------------------------------------------------------------------
@@ -84,10 +106,10 @@ def unpackageGroup(flightID,numPredictions):
 #----------------------------------------------------------------------------- 
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
-def launchPrediction(payload,balloon,parachute,helium,lat,lon,launchTime,tolerance):
+def launchPrediction(payload,balloon,parachute,helium,lat,lon,launchTime,tolerance,ARcorr,UTCdiff):
     
     # Do initial prediction with lanuch from desired lat/lon landing spot
-    data = prediction(payload,balloon,parachute,helium,lat,lon,-1,1,launchTime,-1,0.1,0)
+    data = prediction(payload,balloon,parachute,helium,lat,lon,-1,1,launchTime,-1,0.1,0,-1,UTCdiff)
     # find difference in lat and lon (desired - actual)
     deltaLat = lat - data['Landing Lat']
     deltaLon = lon - data['Landing Lon']
@@ -99,7 +121,7 @@ def launchPrediction(payload,balloon,parachute,helium,lat,lon,launchTime,toleran
     degrees_to_radians = math.pi/180.0
     
     while withinBounds == 0:
-        data = prediction(payload,balloon,parachute,helium,newLat,newLon,-1,1,launchTime,-1,0.1,0)
+        data = prediction(payload,balloon,parachute,helium,newLat,newLon,-1,1,launchTime,-1,0.1,0,-1,UTCdiff)
         
         # phi = 90 - latitude
         phi1 = (90.0 - lat)*degrees_to_radians
@@ -135,21 +157,37 @@ def launchPrediction(payload,balloon,parachute,helium,lat,lon,launchTime,toleran
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
 def coordShift(Lat1,Lon1,Lat2,Lon2):
-    deltaLat = Lat2 - Lat1
-    deltaLon = Lon2 - Lon1
-    degrees_to_radians = math.pi/180.0
+#    deltaLat = Lat2 - Lat1
+#    deltaLon = Lon2 - Lon1
+#    degrees_to_radians = math.pi/180.0
+#    
+#    # phi = 90 - latitude
+#    phi1 = (90.0 - Lat1)*degrees_to_radians
+#    phi2 = (90.0 - Lat2)*degrees_to_radians
+#    
+#    # theta = longitude
+#    theta1 = Lon1*degrees_to_radians
+#    theta2 = Lon2*degrees_to_radians
+#           
+#    cos = (math.sin(phi1)*math.sin(phi2)*math.cos(theta1 - theta2) + math.cos(phi1)*math.cos(phi2))
+#    arc = math.acos(cos)
+#    distance = arc*3958.8*5280
     
-    # phi = 90 - latitude
-    phi1 = (90.0 - Lat1)*degrees_to_radians
-    phi2 = (90.0 - Lat2)*degrees_to_radians
+    # approximate radius of earth in km
+    R = 6373.0
     
-    # theta = longitude
-    theta1 = Lon1*degrees_to_radians
-    theta2 = Lon2*degrees_to_radians
-           
-    cos = (math.sin(phi1)*math.sin(phi2)*math.cos(theta1 - theta2) + math.cos(phi1)*math.cos(phi2))
-    arc = math.acos(cos)
-    distance = arc*3958.8*5280
+    lat1 = radians(Lat1)
+    lon1 = radians(Lon1)
+    lat2 = radians(Lat2)
+    lon2 = radians(Lon2)
+    
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    
+    a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    
+    distance = R * c * 3280.84
     
     return distance
     
@@ -160,13 +198,16 @@ def plotPrediction(data):
     fig = plt.figure(figsize=(40,35))
     ax = fig.gca(projection='3d')
     
+    # Plot nominal prediction
     Color = 'red'
     lineWidth = 5
     Alpha=1
     ax.plot(data['TimeData']['Latitude'], data['TimeData']['Longitude'], data['TimeData']['Altitude'],color=Color,linewidth=lineWidth,alpha=Alpha)
     
+    # Plot ensembles
     lineWidth = 1
     Alpha=0.4
+    Color = 'blue'
     for ensembles in data['Secondary Tracks']:
         ax.plot(data['Secondary Tracks'][str(ensembles)]['Lat'],data['Secondary Tracks'][str(ensembles)]['Lon'],data['Secondary Tracks'][str(ensembles)]['Alt'],color=Color,linewidth=lineWidth,alpha=Alpha)
     
@@ -235,10 +276,13 @@ def PredictionAni(PredData,saving):
 def heatMap(data,apikey):
     lat_list = list(data['Landing Deviations']['Lat'])
     lon_list = list(data['Landing Deviations']['Lon'])   
-    gmap = gmplot.GoogleMapPlotter(statistics.mean(lat_list),statistics.mean(lon_list),10)
+    lats = np.array([data['Inputs']['Lat'],data['Landing Lat']])
+    lons = np.array([data['Inputs']['Lon'],data['Landing Lon']])
+    gmap = gmplot.GoogleMapPlotter(statistics.mean(lats),statistics.mean(lons),9)
     gmap.heatmap(lat_list,lon_list) 
+    gmap.plot(lats,lons)
     gmap.apikey = apikey
-    gmap.draw( "C:\\dev\\MBURSTPython\\map.html" ) 
+    gmap.draw("C:\\dev\\MBURSTPython\\map.html") 
 
 #-----------------------------------------------------------------------------
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
@@ -310,13 +354,13 @@ def plotFlight(flightID,predTotal,predLow,predHigh,plotEnsem,plotType):
     FlightPath['lon'] = lng
     FlightPath['alt'] = alt
     if plotType == '3':
-        traceFlightPath = go.Scatter3d(x = FlightPath['lat'],y = FlightPath['lon'],z = FlightPath['alt'],mode='lines', line=dict(color='black',width=5),text=FlightPath.index,name='Flight Path')
+        traceFlightPath = go.Scatter3d(x = FlightPath['lat'],y = FlightPath['lon'],z = FlightPath['alt'],mode='lines', line=dict(color='black',width=3),text=FlightPath.index,name='Flight Path')
         data.append(traceFlightPath)
     if plotType == '2A':
-        traceFlightPath = go.Scatter(x = FlightPath['alt'].index,y = FlightPath['alt'],mode='lines', line=dict(color='black',width=5),text=FlightPath.index,name='Flight Path')
+        traceFlightPath = go.Scatter(x = FlightPath['alt'].index,y = FlightPath['alt'],mode='lines', line=dict(color='black',width=3),text=FlightPath.index,name='Flight Path')
         data.append(traceFlightPath)
     if plotType == '2L':
-        traceFlightPath = go.Scatter(x = FlightPath['lon'],y = FlightPath['lat'],mode='lines', line=dict(color='black',width=5),text=FlightPath.index,name='Flight Path')
+        traceFlightPath = go.Scatter(x = FlightPath['lon'],y = FlightPath['lat'],mode='lines', line=dict(color='black',width=3),text=FlightPath.index,name='Flight Path')
         data.append(traceFlightPath)
       
     # Plot data      
@@ -334,7 +378,7 @@ def dataToCSV(FlightPath,flightID):
 # Originally written by Aaron J Ridley - https://github.com/aaronjridley/Balloons
 # Modified by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
-def get_args(argv,queryTime,TESTINGtimeDiff):
+def get_args(argv,queryTime,TESTINGtimeDiff,UTCdiff):
     payload   = -1.0
     balloon   = -1.0
     parachute = -1.0
@@ -547,10 +591,12 @@ def get_args(argv,queryTime,TESTINGtimeDiff):
 
     #LaunchTime = datetime.datetime(Year,Month,Day,Hour,0,0)
     
+
     if queryTime == 'now':
-        LaunchTime = datetime.datetime.strptime(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),"%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=TESTINGtimeDiff)
+        LaunchTime = datetime.datetime.strptime(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),"%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=TESTINGtimeDiff) + datetime.timedelta(hours=UTCdiff)
     if queryTime != 'now':
-        LaunchTime = datetime.datetime.strptime(queryTime, '%Y-%m-%d %H:%M:%S')
+        LaunchTime = datetime.datetime.strptime(queryTime, '%Y-%m-%d %H:%M:%S') + datetime.timedelta(hours=UTCdiff)
+    # LaunchTime is now in UTC
         
     Year = LaunchTime.year
     Month = LaunchTime.month
@@ -644,7 +690,8 @@ def get_station(longitude, latitude):
         command = 'curl -o '+outfile+' '+url
         os.system(command)
     if (not os.path.isfile(outfile)):
-        print("Error getting data from URL. Check URL.")
+        print("Could not get data from weather station URL. Check URL.")
+        print(url)
     #print('Done get station '+outfile)
     return (outfile,IsNam,SaveLat,SaveLon,MinDist)
 
@@ -803,20 +850,23 @@ def calculate_helium(NumberOfTanks):
 # Modified by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
 def calc_ascent_rate(RapData, NumberOfHelium, args, altitude):
-
+    # Get temp and pressure at specified altitude
     Temperature,Pressure = get_temperature_and_pressure(altitude,RapData)
 
     Volume = NumberOfHelium * Boltzmann * Temperature/Pressure
 
+    # If it is a zero pressure balloon, do this
     if (args['zero'] == 1):
         if (Volume > args['v']):
             NumberOfHelium = args['v'] * Pressure / (Boltzmann * Temperature)
         Radius = args['r']
         Diameter = Radius * 2
+    # If not a zero pressure balloon, do this
     else:
         Diameter =  2.0 * (3.0 * Volume / (4.0*pi))**(1.0/3.0)
         Radius   = Diameter/2.0
 
+    # Find gravity at specified altitude
     Gravity = SurfaceGravity * (EarthRadius/(EarthRadius+altitude))**2
 
     NetLiftMass = NumberOfHelium * (MassOfAir - MassOfHelium)
@@ -855,12 +905,16 @@ def calc_ascent_rate(RapData, NumberOfHelium, args, altitude):
 # Modified by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
 def calc_descent_rate(RapData, args, altitude):
-
+    # Get gravity at specified altitude
     Gravity = SurfaceGravity * (EarthRadius/(EarthRadius+altitude))**2
 
+    # Get temp and pressure at specified altitude 
     Temperature,Pressure = get_temperature_and_pressure(altitude,RapData)
+    
+    # Get mass density at the found atmospheric conditions 
     MassDensity = MassOfAir * Pressure / (Boltzmann * Temperature)
 
+    # Calculate descent rate
     DescentRate = np.sqrt(2 * args['payload'] * Gravity / (MassDensity * ParachuteDragCoefficient * args['area']));
 
     return DescentRate
@@ -910,6 +964,7 @@ def get_wind(RapData,altitude):
 
     return (ve,vn)
 
+
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
@@ -944,7 +999,7 @@ EarthRadius = 6372000.0 # m
 # Originally written by Aaron J Ridley - https://github.com/aaronjridley/Balloons
 # Modified by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
-def prediction(payload,balloon,parachute,helium,lat,lon,alt,status,queryTime,nEnsembles,errors,TESTINGtimeDiff):
+def prediction(payload,balloon,parachute,helium,lat,lon,alt,status,queryTime,nEnsembles,errors,TESTINGtimeDiff,ARcorr,UTCdiff):
     # Define Input List
     start_time = time.time()
     Inputs = ['balloon.py','-payload='+str(payload), '-balloon='+str(balloon), '-parachute='+str(parachute), '-helium='+str(helium), '-lat='+str(lat), '-lon='+str(lon),'-alt='+str(alt),'-n='+str(nEnsembles),'-error='+str(errors)]
@@ -953,7 +1008,7 @@ def prediction(payload,balloon,parachute,helium,lat,lon,alt,status,queryTime,nEn
         Inputs.append('-de')
        
     #args = get_args(sys.argv)
-    args = get_args(Inputs,queryTime,TESTINGtimeDiff)   
+    args = get_args(Inputs,queryTime,TESTINGtimeDiff,UTCdiff)   
     
     if (args['balloon'] > 0):
     
@@ -1054,6 +1109,16 @@ def prediction(payload,balloon,parachute,helium,lat,lon,alt,status,queryTime,nEn
                 TotalDistance += np.sqrt(Veast*Veast + Vnorth*Vnorth)*dt*MilesPerMeter
     
                 AscentRate,Diameter = calc_ascent_rate(RapData, NumberOfHelium, args, altitude)
+                #AR_corrected = AscentRate
+                ### Reset ascentRate here? ###
+                if (ARcorr != -1):
+                    AR_calc = AscentRate
+                    AscentRate = ARcorr
+                    
+                ##############################
+                
+                
+                
                 if (altitude < args['hover']):
                     altitude = altitude + AscentRate*dt
     
@@ -1184,6 +1249,10 @@ def prediction(payload,balloon,parachute,helium,lat,lon,alt,status,queryTime,nEn
                         latitude  = latitude  + Vnorth * DegPerMeter * dt
         
                         AscentRate,Diameter = calc_ascent_rate(RapData, NumberOfHeliumPerturbed, args, altitude)
+                        ### Reset ascentRate here? ###
+                        if (ARcorr != -1):
+                            AscentRate = ARcorr
+                        ##############################
         
                         if (altitude < args['hover']):
                             altitude = altitude + AscentRate*dt
@@ -1297,6 +1366,12 @@ def prediction(payload,balloon,parachute,helium,lat,lon,alt,status,queryTime,nEn
     
     # Store prediction output stats for nominal prediction 
     AllData['Ascent Rate'] = AscentRateSave * 3.28084
+    if (ARcorr != -1):
+        AllData['AR_corrected'] = True
+        AllData['AR_calc'] = AR_calc * 3.28084
+    if (ARcorr == -1):
+        AllData['AR_corrected'] = False
+        AllData['AR_calc'] = AllData['Ascent Rate']
     AllData['Burst Altitude'] = BurstAltitude * 3.28084
     AllData['Burst Latitude'] = BurstLatitude 
     AllData['Burst Longitude'] = BurstLongitude 

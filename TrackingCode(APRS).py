@@ -5,25 +5,28 @@ import numpy as np
 import math
 
 # User Inputs
-flightID = '02'
-APRScallsign = 'P2130072'   # APRS Callsign
-APRS_apikey = ''
-slackURL = ''
-messageType = 'dm'          # 'dm' or 'predictions'
-recipient = 'Robby'         # dm format: 'Robby', channel format: '#predictions'
+flightID = '13'
+APRScallsign = ''   # APRS Callsign - can be string or list of strings
+APRS_apikey = '42457.M4AFa3hdkXG31'
+slackURL = 'https://hooks.slack.com/services/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'
+messageType = 'channel'          # 'dm' or 'predictions'
+recipient = '#predictions'         # dm format: 'Robby', channel format: '#predictions'
 APRSfreq = 30               # Seconds
-UpperFreqToleraceWarn = 3   # minutes
-UpperFreqToleraceTerm = 5   # minutes
-payload = 6.0               # lbs
-balloonWeight = 1000        # g
+UpperFreqToleraceWarn = 4   # minutes
+UpperFreqToleraceTerm = 6   # minutes
+payload = 8.0               # lbs
+balloonWeight = 1500        # g
 parachuteDia = 6.0          # ft
-helium = 1.5                # tanks
-ensembles = 30              # Number of ensembles to run for each prediction
-errInEnsembles = 0.5        # Error setting for each ensemble
-approxLaunchAlt = 500      # Estimation for what altitude balloon is initially launched from
-reqPred = 10000             # Altitude on the descent that has a required prediction notification
-tolerace = 3000             # [ft] How much of a landing corrdinate change warrents a message to the group
-TESTINGtimeDiff = 6
+helium = 2                  # tanks
+ensembles = 50              # Number of ensembles to run for each prediction
+errInEnsembles = 0.2        # Error setting for each ensemble
+approxLaunchAlt = 800      # Estimation for what altitude balloon is initially launched from
+reqPred = 5000             # Altitude on the descent that has a required prediction notification
+tolerace = 5280             # [ft] How much of a landing corrdinate change warrents a message to the group
+TESTINGtimeDiff = 0         # If testing on a package in a different time zone 
+ascentRateChange = 10000     # Wait until X feet above where tracking began to start altering ascent rate
+AR_crop_factor = 0.25       # When changing the value of ascent rate, only use the last (X*100)% of values from the flight
+UTCdiff = 5;
 
 # Set things up
 tracking = True
@@ -45,6 +48,9 @@ lastNotLat = 0
 lastNotLon = 0
 CycleError = False
 ErrorCode = 0
+AS_adjust_notif = 0
+
+
 
 # Main Tracking Loop
 while tracking == True:
@@ -54,7 +60,7 @@ while tracking == True:
         CycleError = False
         print('Start of 30 second chunk')
         
-        # Try to get APRS position and preform prediction
+        # Try to get APRS position 
         try:
             # Get Current Location, altitude
             print('Getting APRS data')
@@ -64,7 +70,7 @@ while tracking == True:
             lastTrackerTimes.append(lastPacketTime)
             
             # Add current data to track
-            alt.append(APRS_data['altitude'] * 3.281)   # m
+            alt.append(APRS_data['altitude'] * 3.281)   # ft
             lat.append(APRS_data['lat'])
             lng.append(APRS_data['lng'])
             print('Altitude: ' + str(APRS_data['altitude'] * 3.281))
@@ -73,23 +79,25 @@ while tracking == True:
             CycleError = True
             ErrorCode = 1
                   
-        # Figure out state of balloon
+        # If no error has occured yet, figure out state of balloon
         if CycleError == False:
             try:
-                
                 if len(alt) > 1:
-                    gradPrep = np.array(alt)
-                    grad = np.diff(gradPrep)
+                    gradPrep_alt = np.array(alt)
+                    grad_alt = np.diff(gradPrep_alt)
+                    gradPrep_time = np.array(lastTrackerTimes)
+                    grad_time = np.diff(gradPrep_time)                    
                     
-                    if grad[-1] > 0:    # ascent
+                    
+                    if grad_alt[-1] > 0:    # ascent
                         status = 1
-                    if (grad[-1] < -70):    # if it has fallen more than 50 ft, it is descending
+                    if (grad_alt[-1] < -70):    # if it has fallen more than 50 ft, it is descending
                         status = -1
             except:
                 CycleError = True
                 ErrorCode = 2
         
-        # Some Error Catching
+        # If no error has occurred yet, do some Error Catching
         if CycleError == False:
             try:
                 if len(alt) > 1:
@@ -116,13 +124,40 @@ while tracking == True:
                 CycleError = True
                 ErrorCode = 3
         
-        # Do Prediction
+        # Adjust ascent rate
+        if CycleError == False:
+            try:
+                # If we are "ascentRateChange" ft above where we started tracking, and we are going up, then we have enough data to make correction
+                if ((alt[-1] > (alt[0] + ascentRateChange)) and (status == 1)):
+                    # Make ascent rate correction 
+                    # Compute ascent rate
+                    ascent_rates = grad_alt[np.nonzero(grad_alt)] / grad_time[np.nonzero(grad_time)]
+                    # Onlt take the ones that are close to current value (to correct for non-linearity)
+                    croppedARs = ascent_rates[round((1-AR_crop_factor)*ascent_rates.shape[0]):-1]
+                    # Take mean of those values
+                    mean_AS = np.mean(croppedARs[np.nonzero(croppedARs)])
+                    ARcorr = mean_AS / 3.28084 # convert ft/s to m/s
+                    
+                    # Send message to slack that modification was made
+                    if (AS_adjust_notif == 0):
+                        message = 'Adjusted atmospheric model based on recorded flight dynamics'
+                        balloon.send_slack(message,messageType,recipient,slackURL)
+                        AS_adjust_notif = 1
+                else:
+                    ARcorr = -1
+                
+            except:
+                CycleError = True
+                ErrorCode = 8  
+        
+        
+        # If no error has occurred yet, Do Prediction
         if CycleError == False:
             try:
                 # Prediction
                 print('Preforming Prediction: Status ' + str(status))
-                data = balloon.prediction(payload,balloonWeight,parachuteDia,helium,APRS_data['lat'],APRS_data['lng'],APRS_data['altitude'] * 3.281,status,'now',ensembles,errInEnsembles,TESTINGtimeDiff)
-                # Save prediction data to file
+                data = balloon.prediction(payload,balloonWeight,parachuteDia,helium,APRS_data['lat'],APRS_data['lng'],APRS_data['altitude'] * 3.281,status,'now',ensembles,errInEnsembles,TESTINGtimeDiff,ARcorr,UTCdiff)
+                # Save prediction data to file (package data into a file)
                 balloon.package(data,predictionNum,flightID)
                 predictionNum = predictionNum + 1
                 # Stick landing coordinates in vector
@@ -133,7 +168,7 @@ while tracking == True:
                 CycleError = True
                 ErrorCode = 4
         
-        # Do deviation calculation
+        # If no error has occurred yet, Do deviation calculation
         if CycleError == False:
             try:
                 # If more than one predction exists, figure out if it has shifted by a certain tolerace since the last NOTIFICATION
@@ -144,7 +179,7 @@ while tracking == True:
                 CycleError = True
                 ErrorCode = 5
         
-        # Send Slack Message
+        # If no error has occurred yet, Send Slack Message
         if CycleError == False:
             try:
                 # Send Messege to slack channel if: This is the first message 
@@ -158,7 +193,7 @@ while tracking == True:
                     print('Sent first prediction')
                     
                     
-                # Send Messege to slack channel if: Prediction has changed a lot
+                # Send Messege to slack channel if: difference in sequential prrdictions has changed a lot (deviation > tolerace)
                 if (deviation > tolerace):
                     message = str(math.trunc(deviation)) + 'ft landing deviation - Coordinate: ' + 'https://www.google.com/maps/dir/?api=1&destination=' + str(data['Landing Lat']) + ',' + str(data['Landing Lon']) + '&travelmode=driving'
                     balloon.send_slack(message,messageType,recipient,slackURL)
@@ -169,9 +204,9 @@ while tracking == True:
                 CycleError = True
                 ErrorCode = 6
 
+        # If no error has occurred yet, Give last precise prediction once it gets close enough to ground
         if CycleError == False:
             try:
-                # Give last precise prediction once it gets close enough to ground
                 # If maximum point in track is reasonably above launch altitude and status is -1 and altitude is below [reqPred]
                 if (max(alt) > (approxLaunchAlt + 3000)) and (status == -1) and (alt[-1] < reqPred):
                     message = 'Final Prediction, ' + str(alt[-1]) + 'ft: ' + 'https://www.google.com/maps/dir/?api=1&destination=' + str(data['Landing Lat']) + ',' + str(data['Landing Lon']) + '&travelmode=driving'
