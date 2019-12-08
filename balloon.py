@@ -697,7 +697,7 @@ def get_station_data(stations, args):
     station_data = {}
     station_data_newtime = {}
     for index in stations.itertuples():
-        df,date,TimeFound = read_rap('rawDataFiles/'+index[1]+'.txt',args,index[11]!='US')
+        df,date,TimeFound = read_rap('rawDataFiles/'+index[1]+'.txt',args,index[11]=='US')
         df = pd.DataFrame(df)
         if not df.empty and TimeFound:
             station_data[(index[4],index[7])] = df
