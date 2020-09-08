@@ -9,9 +9,9 @@ import numpy
 import pandas as pd
 import pickle
 
-username = 'fortmcas'
+username = ''
 url = 'http://flightxml.flightaware.com/soap/FlightXML2/wsdl'
-apiKey = '113dbde052d45892c914639637c8a6a41913ba6e'
+apiKey = ''
 logging.basicConfig(level=logging.INFO)
 api = Client(url, username=username, password=apiKey)
 
