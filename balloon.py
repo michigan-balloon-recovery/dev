@@ -94,7 +94,7 @@ def unpackage_group(flight_id,num_predictions):
 #----------------------------------------------------------------------------- 
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
-def launchPrediction(payload,balloon,parachute,helium,lat,lon,launch_time,tolerance,ar_corr,utc_diff):
+def launch_prediction(payload,balloon,parachute,helium,lat,lon,launch_time,tolerance,ar_corr,utc_diff):
     
     # Do initial prediction with lanuch from desired lat/lon landing spot
     data = prediction(payload,balloon,parachute,helium,lat,lon,-1,1,launch_time,-1,0.1,0,-1,utc_diff)
@@ -108,7 +108,7 @@ def launchPrediction(payload,balloon,parachute,helium,lat,lon,launch_time,tolera
     degrees_to_radians = math.pi/180.0
     
     while True:
-        data = prediction(payload,balloon,parachute,helium,newLat,newLon,-1,1,launchTime,-1,0.1,0,-1,UTCdiff)
+        data = prediction(payload,balloon,parachute,helium,new_lat,new_lon,-1,1,launch_time,-1,0.1,0,-1,utc_diff)
         
         # phi = 90 - latitude
         phi1 = (90.0 - lat)*degrees_to_radians
@@ -132,42 +132,27 @@ def launchPrediction(payload,balloon,parachute,helium,lat,lon,launch_time,tolera
         new_lat = new_lat + delta_lat
         new_lon = new_lon + delta_lon 
      
-    launchLoc = dict()
-    launchLoc['Lat'] = newLat
-    launchLoc['Lon'] = newLon
-    launchLoc['Tolerace'] = distance
-    return launchLoc
+    launch_loc = dict()
+    launch_loc['Lat'] = new_lat
+    launch_loc['Lon'] = new_lon
+    launch_loc['Tolerace'] = distance
+    return launch_loc
 
 #-----------------------------------------------------------------------------
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
-def coordShift(Lat1,Lon1,Lat2,Lon2):
-#    deltaLat = Lat2 - Lat1
-#    deltaLon = Lon2 - Lon1
-#    degrees_to_radians = math.pi/180.0
-#    
-#    # phi = 90 - latitude
-#    phi1 = (90.0 - Lat1)*degrees_to_radians
-#    phi2 = (90.0 - Lat2)*degrees_to_radians
-#    
-#    # theta = longitude
-#    theta1 = Lon1*degrees_to_radians
-#    theta2 = Lon2*degrees_to_radians
-#           
-#    cos = (math.sin(phi1)*math.sin(phi2)*math.cos(theta1 - theta2) + math.cos(phi1)*math.cos(phi2))
-#    arc = math.acos(cos)
-#    distance = arc*3958.8*5280
+def coord_shift(lat_1,lon_1,lat_2,lon_2):
     
     # approximate radius of earth in km
     R = 6373.0
     
-    lat1 = radians(Lat1)
-    lon1 = radians(Lon1)
-    lat2 = radians(Lat2)
-    lon2 = radians(Lon2)
+    lat_1 = radians(lat_1)
+    lon_1 = radians(lon_1)
+    lat_2 = radians(lat_2)
+    lon_2 = radians(lon_2)
     
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
+    d_lon = lon_2 - lon_1
+    d_lat = lat_2 - lat_1
     
     a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
@@ -179,22 +164,22 @@ def coordShift(Lat1,Lon1,Lat2,Lon2):
 #-----------------------------------------------------------------------------
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
-def plotPrediction(data):
+def plot_prediction(data):
     fig = plt.figure(figsize=(40,35))
     ax = fig.gca(projection='3d')
     
     # Plot nominal prediction
-    Color = 'red'
-    lineWidth = 5
-    Alpha=1
-    ax.plot(data['TimeData']['Latitude'], data['TimeData']['Longitude'], data['TimeData']['Altitude'],color=Color,linewidth=lineWidth,alpha=Alpha)
+    color = 'red'
+    line_width = 5
+    alpha=1
+    ax.plot(data['TimeData']['Latitude'], data['TimeData']['Longitude'], data['TimeData']['Altitude'],color=color,linewidth=line_width,alpha=alpha)
     
     # Plot ensembles
-    lineWidth = 1
-    Alpha=0.4
-    Color = 'blue'
+    line_width = 1
+    alpha=0.4
+    color = 'blue'
     for ensembles in data['Secondary Tracks']:
-        ax.plot(data['Secondary Tracks'][str(ensembles)]['Lat'],data['Secondary Tracks'][str(ensembles)]['Lon'],data['Secondary Tracks'][str(ensembles)]['Alt'],color=Color,linewidth=lineWidth,alpha=Alpha)
+        ax.plot(data['Secondary Tracks'][str(ensembles)]['Lat'],data['Secondary Tracks'][str(ensembles)]['Lon'],data['Secondary Tracks'][str(ensembles)]['Alt'],color=color,linewidth=line_width,alpha=alpha)
     
     plt.show()
 
