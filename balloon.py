@@ -29,98 +29,85 @@ import plotly.express as px
 #-----------------------------------------------------------------------------
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
-def APRS(callsign_entry,APRS_apikey):
+def APRS(callsign_entry,aprs_apikey):
     # Figure out what variable type "callsign" is and convert them to appropriate type
-    if (isinstance(callsign_entry,str) == True):
-        callsign = callsign_entry
-    if (isinstance(callsign_entry,list) == True):
-        callsign = ",".join(callsign_entry)
+    callsign = ",".join(callsign_entry)
         
     # Pull data from APRS
     json_response= requests.get("http://api.aprs.fi/api/get?name="+callsign+"&what=loc&apikey="+APRS_apikey+"&format=json")
     aprs_dict = json.loads(json_response.text) 
     
-    # If callsign is a string, just take the data from that as output
-    if (isinstance(callsign_entry,str) == True):
-        APRS_data = aprs_dict['entries'][0]
+    latest_time = 0
+    for callsign_instance in aprs_dict['entries']:
+        last_time = int(callsign_instance['lasttime'])
+        if (last_time > latest_time):
+            lastest_time = last_time
+            best_callsign = callsign_instance
+    aprs_data = best_callsign
         
-    # If multiple callsigns are given, find one that has the most recent data and use that for output
-    if (isinstance(callsign_entry,list) == True): 
-        latestTime = 0;
-        for callsign_instance in range(1,len(aprs_dict['entries'])):
-            last_time = int(aprs_dict['entries'][callsign_instance]['lasttime'])
-            if (last_time > latestTime):
-                lastestTime = last_time
-                bestCallsign = callsign_instance;
-        APRS_data = aprs_dict['entries'][bestCallsign]
-        
-    return APRS_data
+    return aprs_data
 
 #-----------------------------------------------------------------------------
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
-def send_slack(messageString,messageType,recipient,slackURL):
+def send_slack(message_string,message_type,recipient,slack_url):
     icon = "ghost"
-    botUsername = "Python Bot"
+    bot_username = "Python Bot"
    
-    if messageType == 'dm':
-        messageType = "message"
+    if message_type == 'dm':
+        message_type = "message"
         
-    if messageType == 'channel':
-        messageType = "channel"
+    if message_type == 'channel':
+        message_type = "channel"
     
-    curlcommand = "curl -X POST --data-urlencode "
-    payloadcommand = '"payload={\\"'+messageType+'\\": \\"'+recipient+'\\", \\"username\\": \\"' + botUsername + '\\", \\"text\\": \\"' + messageString + '\\", \\"icon_emoji\\": \\":' + icon + ':\\"}" ' + slackURL
-    command = curlcommand+payloadcommand
-    #os.system(command)
+    curl_command = "curl -X POST --data-urlencode "
+    payload_command = '"payload={\\"'+message_type+'\\": \\"'+recipient+'\\", \\"username\\": \\"' + bot_username + '\\", \\"text\\": \\"' + message_string + '\\", \\"icon_emoji\\": \\":' + icon + ':\\"}" ' + slack_url
+    command = curl_command+payload_command
     subprocess.run(command)
 
 #-----------------------------------------------------------------------------
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
-def package(dataset,prediction_ID,flightID):
-    pickle_out = open(flightID+'_'+str(prediction_ID)+".pickle","wb")
+def package(dataset,prediction_id,flight_id):
+    pickle_out = open(flight_id+'_'+str(prediction_id)+".pickle","wb")
     pickle.dump(dataset, pickle_out)
     pickle_out.close()
     
 #-----------------------------------------------------------------------------
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
-def unpackage(prediction_ID,flightID):
-    #path = ''
-    #pickle_in = open(path+'\\'+prediction_ID+".pickle","rb")
-    pickle_in = open(flightID+'_'+str(prediction_ID)+".pickle","rb")
+def unpackage(prediction_id,flight_id):
+    pickle_in = open(flight_id+'_'+str(prediction_id)+".pickle","rb")
     dataset = pickle.load(pickle_in)
     return dataset
 
 #-----------------------------------------------------------------------------
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
-def unpackageGroup(flightID,numPredictions):
-    allPredictions = dict()
-    for predictionID in range(1,numPredictions+1):
-        data = unpackage(predictionID,flightID)
-        allPredictions[str(predictionID)] = data
-    return allPredictions
+def unpackage_group(flight_id,num_predictions):
+    all_predictions = dict()
+    for prediction_id in range(1,num_predictions+1):
+        data = unpackage(prediction_id,flight_id)
+        all_predictions[str(prediction_id)] = data
+    return all_predictions
 
 #----------------------------------------------------------------------------- 
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
-def launchPrediction(payload,balloon,parachute,helium,lat,lon,launchTime,tolerance,ARcorr,UTCdiff):
+def launchPrediction(payload,balloon,parachute,helium,lat,lon,launch_time,tolerance,ar_corr,utc_diff):
     
     # Do initial prediction with lanuch from desired lat/lon landing spot
-    data = prediction(payload,balloon,parachute,helium,lat,lon,-1,1,launchTime,-1,0.1,0,-1,UTCdiff)
+    data = prediction(payload,balloon,parachute,helium,lat,lon,-1,1,launch_time,-1,0.1,0,-1,utc_diff)
     # find difference in lat and lon (desired - actual)
-    deltaLat = lat - data['Landing Lat']
-    deltaLon = lon - data['Landing Lon']
+    delta_lat = lat - data['Landing Lat']
+    delta_lon = lon - data['Landing Lon']
     
-    newLat = lat + deltaLat
-    newLon = lon + deltaLon    
+    new_lat = lat + delta_lat
+    new_lon = lon + delta_lon    
     
-    withinBounds = 0
     degrees_to_radians = math.pi/180.0
     
-    while withinBounds == 0:
+    while True:
         data = prediction(payload,balloon,parachute,helium,newLat,newLon,-1,1,launchTime,-1,0.1,0,-1,UTCdiff)
         
         # phi = 90 - latitude
@@ -136,16 +123,14 @@ def launchPrediction(payload,balloon,parachute,helium,lat,lon,launchTime,toleran
         distance = arc*3958.8*5280
         
         if distance <= tolerance:
-            #print('Reached distance: '+str(distance)+' ft')
             break
-        #print('Failed: '+str(distance)+' ft')
         
         # find difference in lat and lon (desired - actual)
-        deltaLat = lat - data['Landing Lat']
-        deltaLon = lon - data['Landing Lon']
+        delta_lat = lat - data['Landing Lat']
+        delta_lon = lon - data['Landing Lon']
         
-        newLat = newLat + deltaLat
-        newLon = newLon + deltaLon 
+        new_lat = new_lat + delta_lat
+        new_lon = new_lon + delta_lon 
      
     launchLoc = dict()
     launchLoc['Lat'] = newLat
@@ -300,7 +285,7 @@ def plotFlight(flightID,predTotal,predLow,predHigh,plotEnsem,plotType):
     plotly.offline.init_notebook_mode()
     
     # Get all predictions data
-    AllData = unpackageGroup(flightID,predTotal)
+    AllData = unpackage_group(flightID,predTotal)
     print("All data read in")
     
     # Initialize variables 
