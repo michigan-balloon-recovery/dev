@@ -5,8 +5,12 @@ import numpy as np
 import math
 
 # User Inputs
-flightID = '13'
+flightID = '07'
 APRScallsign = ''   # APRS Callsign - can be string or list of strings
+APRS_apikey = ''
+slackURL = ''
+messageType = ''          # 'dm' or 'predictions'
+recipient = ''         # dm format: 'Robby', channel format: '#predictions'
 APRSfreq = 30               # Seconds
 UpperFreqToleraceWarn = 4   # minutes
 UpperFreqToleraceTerm = 6   # minutes
@@ -16,13 +20,12 @@ parachuteDia = 6.0          # ft
 helium = 2                  # tanks
 ensembles = 50              # Number of ensembles to run for each prediction
 errInEnsembles = 0.2        # Error setting for each ensemble
-approxLaunchAlt = 800      # Estimation for what altitude balloon is initially launched from
-reqPred = 5000             # Altitude on the descent that has a required prediction notification
-tolerace = 5280             # [ft] How much of a landing corrdinate change warrents a message to the group
-TESTINGtimeDiff = 0         # If testing on a package in a different time zone 
-ascentRateChange = 10000     # Wait until X feet above where tracking began to start altering ascent rate
+approxLaunchAlt = 2000      # Estimation for what altitude balloon is initially launched from
+reqPred = 10000             # Altitude on the descent that has a required prediction notification
+tolerace = 4000             # [ft] How much of a landing corrdinate change warrents a message to the group
+TESTINGtimeDiff = 6         # If testing on a package in a different time zone 
+ascentRateChange = 7000     # Wait until X feet above where tracking began to start altering ascent rate
 AR_crop_factor = 0.25       # When changing the value of ascent rate, only use the last (X*100)% of values from the flight
-UTCdiff = 5;
 
 # Set things up
 tracking = True
