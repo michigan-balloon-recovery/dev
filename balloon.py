@@ -106,10 +106,10 @@ def unpackageGroup(flightID,numPredictions):
 #----------------------------------------------------------------------------- 
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
-def launchPrediction(payload,balloon,parachute,helium,lat,lon,launchTime,tolerance,ARcorr):
+def launchPrediction(payload,balloon,parachute,helium,lat,lon,launchTime,tolerance,ARcorr,UTCdiff):
     
     # Do initial prediction with lanuch from desired lat/lon landing spot
-    data = prediction(payload,balloon,parachute,helium,lat,lon,-1,1,launchTime,-1,0.1,0,-1)
+    data = prediction(payload,balloon,parachute,helium,lat,lon,-1,1,launchTime,-1,0.1,0,-1,UTCdiff)
     # find difference in lat and lon (desired - actual)
     deltaLat = lat - data['Landing Lat']
     deltaLon = lon - data['Landing Lon']
@@ -121,7 +121,7 @@ def launchPrediction(payload,balloon,parachute,helium,lat,lon,launchTime,toleran
     degrees_to_radians = math.pi/180.0
     
     while withinBounds == 0:
-        data = prediction(payload,balloon,parachute,helium,newLat,newLon,-1,1,launchTime,-1,0.1,0,-1)
+        data = prediction(payload,balloon,parachute,helium,newLat,newLon,-1,1,launchTime,-1,0.1,0,-1,UTCdiff)
         
         # phi = 90 - latitude
         phi1 = (90.0 - lat)*degrees_to_radians
@@ -276,10 +276,13 @@ def PredictionAni(PredData,saving):
 def heatMap(data,apikey):
     lat_list = list(data['Landing Deviations']['Lat'])
     lon_list = list(data['Landing Deviations']['Lon'])   
-    gmap = gmplot.GoogleMapPlotter(statistics.mean(lat_list),statistics.mean(lon_list),10)
+    lats = np.array([data['Inputs']['Lat'],data['Landing Lat']])
+    lons = np.array([data['Inputs']['Lon'],data['Landing Lon']])
+    gmap = gmplot.GoogleMapPlotter(statistics.mean(lats),statistics.mean(lons),9)
     gmap.heatmap(lat_list,lon_list) 
+    gmap.plot(lats,lons)
     gmap.apikey = apikey
-    gmap.draw( "C:\\dev\\MBURSTPython\\map.html" ) 
+    gmap.draw("C:\\dev\\MBURSTPython\\map.html") 
 
 #-----------------------------------------------------------------------------
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
@@ -375,7 +378,7 @@ def dataToCSV(FlightPath,flightID):
 # Originally written by Aaron J Ridley - https://github.com/aaronjridley/Balloons
 # Modified by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
-def get_args(argv,queryTime,TESTINGtimeDiff):
+def get_args(argv,queryTime,TESTINGtimeDiff,UTCdiff):
     payload   = -1.0
     balloon   = -1.0
     parachute = -1.0
@@ -588,10 +591,12 @@ def get_args(argv,queryTime,TESTINGtimeDiff):
 
     #LaunchTime = datetime.datetime(Year,Month,Day,Hour,0,0)
     
+
     if queryTime == 'now':
-        LaunchTime = datetime.datetime.strptime(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),"%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=TESTINGtimeDiff)
+        LaunchTime = datetime.datetime.strptime(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),"%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=TESTINGtimeDiff) + datetime.timedelta(hours=UTCdiff)
     if queryTime != 'now':
-        LaunchTime = datetime.datetime.strptime(queryTime, '%Y-%m-%d %H:%M:%S')
+        LaunchTime = datetime.datetime.strptime(queryTime, '%Y-%m-%d %H:%M:%S') + datetime.timedelta(hours=UTCdiff)
+    # LaunchTime is now in UTC
         
     Year = LaunchTime.year
     Month = LaunchTime.month
@@ -994,7 +999,7 @@ EarthRadius = 6372000.0 # m
 # Originally written by Aaron J Ridley - https://github.com/aaronjridley/Balloons
 # Modified by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
-def prediction(payload,balloon,parachute,helium,lat,lon,alt,status,queryTime,nEnsembles,errors,TESTINGtimeDiff,ARcorr):
+def prediction(payload,balloon,parachute,helium,lat,lon,alt,status,queryTime,nEnsembles,errors,TESTINGtimeDiff,ARcorr,UTCdiff):
     # Define Input List
     start_time = time.time()
     Inputs = ['balloon.py','-payload='+str(payload), '-balloon='+str(balloon), '-parachute='+str(parachute), '-helium='+str(helium), '-lat='+str(lat), '-lon='+str(lon),'-alt='+str(alt),'-n='+str(nEnsembles),'-error='+str(errors)]
@@ -1003,7 +1008,7 @@ def prediction(payload,balloon,parachute,helium,lat,lon,alt,status,queryTime,nEn
         Inputs.append('-de')
        
     #args = get_args(sys.argv)
-    args = get_args(Inputs,queryTime,TESTINGtimeDiff)   
+    args = get_args(Inputs,queryTime,TESTINGtimeDiff,UTCdiff)   
     
     if (args['balloon'] > 0):
     

@@ -4,35 +4,51 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import numpy as np
 import matplotlib
+import requests
+import json
 
 ###### INPUTS ########
-payload = 6.0                           # lbs
-balloonWeight = 1000                    # g
+payload = 8                          # lbs
+balloonWeight = 1500                    # g
 parachuteDia = 6.0                      # ft
-helium = 1.5                            # tanks
-desiredLat = 42.290977
-desiredLon = -83.717548
-launchTime = '2019-10-26 12:00:00'      # Best guess of when balloon will be launched
+helium = 2                            # tanks
+desiredLat = 42.066068
+desiredLon = -83.814432
+launchTime = '2019-11-24 11:00:00'      # Best guess of when balloon will be launched, local time
 tolerace = 10                           # ft - how close the conversion has to get 
+ensem = 50;
+ensem_per = 0.3;
+UTCdiff = 5;
+doDrivingCalc = True
 ######################
 
 
-# Do a single prediction
-#data = balloon.prediction(payload,balloonWeight,parachuteDia,helium,desiredLat,desiredLon,-1,1,launchTime,5,0.2,0,-1)
-
-# Animate the result
-#balloon.PredictionAni(data,0)
-
-
 # Do backwards prediction calculation
-launchLoc = balloon.launchPrediction(payload,balloonWeight,parachuteDia,helium,desiredLat,desiredLon,launchTime,tolerace,0)
+launchLoc = balloon.launchPrediction(payload,balloonWeight,parachuteDia,helium,desiredLat,desiredLon,launchTime,tolerace,0,UTCdiff)
+print('Launch Location: ' + str(launchLoc['Lat']) + ',' + str(launchLoc['Lon']))
 print('Distance reached: '+str(launchLoc['Tolerace']))
 
 # Check work from backwards calculation
-data = balloon.prediction(payload,balloonWeight,parachuteDia,helium,launchLoc['Lat'],launchLoc['Lon'],-1,1,launchTime,50,0.2,0,-1)
-balloon.plotPrediction(data)
-print('Actual Lat: ' + str(data['Landing Lat']))
-print('Actual Lon: ' + str(data['Landing Lon']))
+data = balloon.prediction(payload,balloonWeight,parachuteDia,helium,launchLoc['Lat'],launchLoc['Lon'],-1,1,launchTime,ensem,ensem_per,0,-1,UTCdiff)
+#balloon.plotPrediction(data)
+print('Requested: ' + str(desiredLat) + ',' + str(desiredLon))
+print('Actual: ' + str(data['Landing Lat']) + ',' + str(data['Landing Lon']))
+print('Popping Altitude: ' + str(data['Burst Altitude']) + ' ft')
+popTime = data['TimeData'].loc[data['TimeData']['Status'] == 1].index[-1]
+print('Rise time: ' + str(popTime - data['Inputs']['Launch Time']))
+print('Flight time: ' + str(data['Landing Time'] - data['Inputs']['Launch Time']))
+if (doDrivingCalc == True):
+    origin = str(launchLoc['Lat']) + ',' + str(launchLoc['Lon'])
+    destination = str(data['Landing Lat']) + ',' + str(data['Landing Lon'])
+    string = 'https://maps.googleapis.com/maps/api/distancematrix/json?units=imperial&origins=' + origin + '&destinations=' + destination + '&key=' + apikey
+    json_response= requests.get(string)
+    dis_dict = json.loads(json_response.text) 
+    drivingTime = dis_dict['rows'][0]['elements'][0]['duration']['text']
+    drivingDistance = dis_dict['rows'][0]['elements'][0]['distance']['text']
+    print('Driving Time: ' + drivingTime)
+    print('Driving Distance: ' + drivingDistance)
+
+balloon.heatMap(data,'')
 
 
 # Cost function stuff
@@ -49,35 +65,4 @@ def costFunction(x,lower,costType):
                  0]   
     cost = np.piecewise(x, conds, funcs)
     return cost
-
-#def mapValue(value, leftMin, leftMax, rightMin, rightMax):
-#    # Maps value or vector from one domain to another. 
-#    # Returns new value or vector.
-#    leftSpan = leftMax - leftMin
-#    rightSpan = rightMax - rightMin
-#    valueScaled = np.array(value - leftMin) / np.array(leftSpan)
-#    return rightMin + (valueScaled * rightSpan)
-
-
-weight_min = 0.6
-weight_average = 1.0-weight_min
-
-costType = 'quad'
-labelSize = 30
-lower = 5
-
-xx = np.linspace(0, 10, 1000)
-plt.figure(figsize=(20,15))
-matplotlib.rc('xtick', labelsize=labelSize) 
-matplotlib.rc('ytick', labelsize=labelSize) 
-
-plt.plot(xx, costFunction(xx,lower,costType))
-
-plt.xlabel('Distance (miles)',fontsize=labelSize)
-plt.ylabel('Cost before weight',fontsize=labelSize)
-plt.show() 
-
-
-
-
 

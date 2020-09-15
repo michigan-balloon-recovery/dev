@@ -27,7 +27,6 @@ TESTINGtimeDiff = 6         # If testing on a package in a different time zone
 ascentRateChange = 7000     # Wait until X feet above where tracking began to start altering ascent rate
 AR_crop_factor = 0.25       # When changing the value of ascent rate, only use the last (X*100)% of values from the flight
 
-
 # Set things up
 tracking = True
 status = 1
@@ -156,7 +155,7 @@ while tracking == True:
             try:
                 # Prediction
                 print('Preforming Prediction: Status ' + str(status))
-                data = balloon.prediction(payload,balloonWeight,parachuteDia,helium,APRS_data['lat'],APRS_data['lng'],APRS_data['altitude'] * 3.281,status,'now',ensembles,errInEnsembles,TESTINGtimeDiff,ARcorr)
+                data = balloon.prediction(payload,balloonWeight,parachuteDia,helium,APRS_data['lat'],APRS_data['lng'],APRS_data['altitude'] * 3.281,status,'now',ensembles,errInEnsembles,TESTINGtimeDiff,ARcorr,UTCdiff)
                 # Save prediction data to file (package data into a file)
                 balloon.package(data,predictionNum,flightID)
                 predictionNum = predictionNum + 1
