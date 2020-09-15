@@ -66,34 +66,3 @@ def costFunction(x,lower,costType):
     cost = np.piecewise(x, conds, funcs)
     return cost
 
-#def mapValue(value, leftMin, leftMax, rightMin, rightMax):
-#    # Maps value or vector from one domain to another. 
-#    # Returns new value or vector.
-#    leftSpan = leftMax - leftMin
-#    rightSpan = rightMax - rightMin
-#    valueScaled = np.array(value - leftMin) / np.array(leftSpan)
-#    return rightMin + (valueScaled * rightSpan)
-
-
-#weight_min = 0.6
-#weight_average = 1.0-weight_min
-#
-#costType = 'quad'
-#labelSize = 30
-#lower = 5
-#
-#xx = np.linspace(0, 10, 1000)
-#plt.figure(figsize=(20,15))
-#matplotlib.rc('xtick', labelsize=labelSize) 
-#matplotlib.rc('ytick', labelsize=labelSize) 
-#
-#plt.plot(xx, costFunction(xx,lower,costType))
-#
-#plt.xlabel('Distance (miles)',fontsize=labelSize)
-#plt.ylabel('Cost before weight',fontsize=labelSize)
-#plt.show() 
-
-
-
-
-
