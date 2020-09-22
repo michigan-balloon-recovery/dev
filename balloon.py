@@ -154,7 +154,7 @@ def coord_shift(lat_1,lon_1,lat_2,lon_2):
     d_lon = lon_2 - lon_1
     d_lat = lat_2 - lat_1
     
-    a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
+    a = sin(d_lat / 2)**2 + cos(lat_1) * cos(lat_2) * sin(d_lon / 2)**2
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
     
     distance = R * c * 3280.84
