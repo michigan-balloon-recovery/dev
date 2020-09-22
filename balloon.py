@@ -25,11 +25,31 @@ import plotly
 import plotly.graph_objs as go
 import plotly.express as px
 
+ParachuteFudge = 0.333
+BalloonDragCoefficient = 0.5
+ParachuteDragCoefficient = 1.5
 
-#-----------------------------------------------------------------------------
-# Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
+dt = 10.0
+
+KnotsToMps = 0.514444
+LbsToKgs = 0.453592
+pi = 3.1415927
+FtToMeters = 0.3048
+dtor = pi/180.0
+MilesPerMeter = 0.000621371
+
+Boltzmann = 1.38070e-23
+
+MassOfAir = 4.88e-26 # kg
+MassOfHelium = 6.69e-27 # kg
+
+SurfaceGravity = 9.80665 # m/s2
+EarthRadius = 6372000.0 # m
+
 def APRS(callsign_entry,aprs_apikey):
+    """
+    Hits the APRS API endpoint to get data for specified callsign
+    """
     # Figure out what variable type "callsign" is and convert them to appropriate type
     callsign = ",".join(callsign_entry)
         
@@ -47,10 +67,10 @@ def APRS(callsign_entry,aprs_apikey):
         
     return aprs_data
 
-#-----------------------------------------------------------------------------
-# Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def send_slack(message_string,message_type,recipient,slack_url):
+    """
+    Send slack message
+    """
     icon = "ghost"
     bot_username = "Python Bot"
    
@@ -65,35 +85,32 @@ def send_slack(message_string,message_type,recipient,slack_url):
     command = curl_command+payload_command
     subprocess.run(command)
 
-#-----------------------------------------------------------------------------
-# Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def package(dataset,prediction_id,flight_id):
+    """
+    Helper function to pickle/package data
+    """
     pickle_out = open(flight_id+'_'+str(prediction_id)+".pickle","wb")
     pickle.dump(dataset, pickle_out)
     pickle_out.close()
     
-#-----------------------------------------------------------------------------
-# Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def unpackage(prediction_id,flight_id):
+    """
+    Helper function to unpickle/unpackage data
+    """
     pickle_in = open(flight_id+'_'+str(prediction_id)+".pickle","rb")
     dataset = pickle.load(pickle_in)
     return dataset
 
-#-----------------------------------------------------------------------------
-# Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def unpackage_group(flight_id,num_predictions):
+    """
+    Helper function to unpickle/unpackage a group of predictions
+    """
     all_predictions = dict()
     for prediction_id in range(1,num_predictions+1):
         data = unpackage(prediction_id,flight_id)
         all_predictions[str(prediction_id)] = data
     return all_predictions
 
-#----------------------------------------------------------------------------- 
-# Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def launch_prediction(payload,balloon,parachute,helium,lat,lon,launch_time,tolerance,ar_corr,utc_diff):
     
     # Do initial prediction with lanuch from desired lat/lon landing spot
@@ -138,9 +155,6 @@ def launch_prediction(payload,balloon,parachute,helium,lat,lon,launch_time,toler
     launch_loc['Tolerace'] = distance
     return launch_loc
 
-#-----------------------------------------------------------------------------
-# Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def coord_shift(lat_1,lon_1,lat_2,lon_2):
     
     # approximate radius of earth in km
@@ -161,9 +175,6 @@ def coord_shift(lat_1,lon_1,lat_2,lon_2):
     
     return distance
     
-#-----------------------------------------------------------------------------
-# Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def plot_prediction(data):
     fig = plt.figure(figsize=(40,35))
     ax = fig.gca(projection='3d')
@@ -183,9 +194,6 @@ def plot_prediction(data):
     
     plt.show()
 
-#-----------------------------------------------------------------------------
-# Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def PredictionAni(PredData,saving):
     def update_lines(num, dataLines, lines):
         for line, data in zip(lines, dataLines):
@@ -240,9 +248,6 @@ def PredictionAni(PredData,saving):
         print('Saving File...')
         line_ani.save('FlightPath.gif')
 
-#-----------------------------------------------------------------------------
-# Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def heatMap(data,apikey):
     lat_list = list(data['Landing Deviations']['Lat'])
     lon_list = list(data['Landing Deviations']['Lon'])   
@@ -254,17 +259,11 @@ def heatMap(data,apikey):
     gmap.apikey = apikey
     gmap.draw("C:\\dev\\MBURSTPython\\map.html") 
 
-#-----------------------------------------------------------------------------
-# Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def plotStations(loc):
     if loc == 'US':
         stationData = pd.read_csv(os.getcwd()+'\\StationList.txt',delimiter=' ',header=None)
     return stationData
 
-#-----------------------------------------------------------------------------
-# Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def plotFlight(flightID,predTotal,predLow,predHigh,plotEnsem,plotType):
     # Set plotly credentials 
     plotly.offline.init_notebook_mode()
@@ -338,16 +337,9 @@ def plotFlight(flightID,predTotal,predLow,predHigh,plotEnsem,plotType):
     
     return (AllData,data,FlightPath)
     
-#-----------------------------------------------------------------------------
-# Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def dataToCSV(FlightPath,flightID):
     FlightPath.to_csv('Flight'+flightID+'.csv',index_label = 'Time')    
 
-#-----------------------------------------------------------------------------
-# Originally written by Aaron J Ridley - https://github.com/aaronjridley/Balloons
-# Modified by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def get_args(argv,queryTime,TESTINGtimeDiff,UTCdiff):
     payload   = -1.0
     balloon   = -1.0
@@ -602,10 +594,6 @@ def get_args(argv,queryTime,TESTINGtimeDiff,UTCdiff):
             'stime':sTimeNow}
     return args
 
-#-----------------------------------------------------------------------------
-# Originally written by Aaron J Ridley - https://github.com/aaronjridley/Balloons
-# Modified by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def get_station(longitude, latitude):
     #print("get_station")
     
@@ -665,10 +653,6 @@ def get_station(longitude, latitude):
     #print('Done get station '+outfile)
     return (outfile,IsNam,SaveLat,SaveLon,MinDist)
 
-#-----------------------------------------------------------------------------
-# Originally written by Aaron J Ridley - https://github.com/aaronjridley/Balloons
-# Modified by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def read_rap(file,args,IsNam):
     #print("read_rap")
     
@@ -691,7 +675,7 @@ def read_rap(file,args,IsNam):
     temperature = []
 
     # Search through file line by line in order to find the right forcast time
-    IsDone = 0;
+    IsDone = 0
     while (IsDone == 0):
         line = fpin.readline()
         if (not line):
@@ -773,10 +757,6 @@ def read_rap(file,args,IsNam):
     #print('end read rap')        
     return (data,forcastTime)
 
-#-----------------------------------------------------------------------------
-# Originally written by Aaron J Ridley - https://github.com/aaronjridley/Balloons
-# Modified by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def KaymontBalloonBurst(BalloonMass):
     # Balloon Masses
     kaymontMass = [200, 300, 350, 450, 500, 
@@ -796,10 +776,6 @@ def KaymontBalloonBurst(BalloonMass):
 
     return burst
 
-#-----------------------------------------------------------------------------
-# Originally written by Aaron J Ridley - https://github.com/aaronjridley/Balloons
-# Modified by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def calculate_helium(NumberOfTanks):
     # Assumes Room Temperature:
     RoomTemp = 294.261
@@ -815,10 +791,6 @@ def calculate_helium(NumberOfTanks):
 
     return NumberOfHe
 
-#-----------------------------------------------------------------------------
-# Originally written by Aaron J Ridley - https://github.com/aaronjridley/Balloons
-# Modified by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def calc_ascent_rate(RapData, NumberOfHelium, args, altitude):
     # Get temp and pressure at specified altitude
     Temperature,Pressure = get_temperature_and_pressure(altitude,RapData)
@@ -841,7 +813,7 @@ def calc_ascent_rate(RapData, NumberOfHelium, args, altitude):
 
     NetLiftMass = NumberOfHelium * (MassOfAir - MassOfHelium)
 
-    NetLiftForce = (NetLiftMass - args['payload'] - args['balloon']/1000) * Gravity;
+    NetLiftForce = (NetLiftMass - args['payload'] - args['balloon']/1000) * Gravity
 
     MassDensity = MassOfAir * Pressure / (Boltzmann * Temperature)
 
@@ -870,10 +842,6 @@ def calc_ascent_rate(RapData, NumberOfHelium, args, altitude):
 
     return (AscentRate, Diameter)
 
-#-----------------------------------------------------------------------------
-# Originally written by Aaron J Ridley - https://github.com/aaronjridley/Balloons
-# Modified by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def calc_descent_rate(RapData, args, altitude):
     # Get gravity at specified altitude
     Gravity = SurfaceGravity * (EarthRadius/(EarthRadius+altitude))**2
@@ -885,14 +853,10 @@ def calc_descent_rate(RapData, args, altitude):
     MassDensity = MassOfAir * Pressure / (Boltzmann * Temperature)
 
     # Calculate descent rate
-    DescentRate = np.sqrt(2 * args['payload'] * Gravity / (MassDensity * ParachuteDragCoefficient * args['area']));
+    DescentRate = np.sqrt(2 * args['payload'] * Gravity / (MassDensity * ParachuteDragCoefficient * args['area']))
 
     return DescentRate
 
-#-----------------------------------------------------------------------------
-# Originally written by Aaron J Ridley - https://github.com/aaronjridley/Balloons
-# Modified by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def get_temperature_and_pressure(altitude,RapData):
     i = 0
 
@@ -912,10 +876,6 @@ def get_temperature_and_pressure(altitude,RapData):
     return (temp,pres)
 
 
-#-----------------------------------------------------------------------------
-# Originally written by Aaron J Ridley - https://github.com/aaronjridley/Balloons
-# Modified by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def get_wind(RapData,altitude):
 
     i = 0
@@ -935,40 +895,6 @@ def get_wind(RapData,altitude):
     return (ve,vn)
 
 
-#-----------------------------------------------------------------------------
-#-----------------------------------------------------------------------------
-#-----------------------------------------------------------------------------
-#-----------------------------------------------------------------------------
-
-ParachuteFudge = 0.333
-BalloonDragCoefficient = 0.5
-ParachuteDragCoefficient = 1.5
-
-dt = 10.0
-
-KnotsToMps = 0.514444
-LbsToKgs = 0.453592
-pi = 3.1415927
-FtToMeters = 0.3048
-dtor = pi/180.0
-MilesPerMeter = 0.000621371
-
-#UniversalGasConstant = 8.31432
-#AirGasConstant = 286.9     # Joules / mol / K
-#HeliumGasConstant = 2077.0 # Joules / mol / K
-
-Boltzmann = 1.38070e-23
-
-MassOfAir = 4.88e-26 # kg
-MassOfHelium = 6.69e-27 # kg
-
-SurfaceGravity = 9.80665 # m/s2
-EarthRadius = 6372000.0 # m
-
-#-----------------------------------------------------------------------------
-# Originally written by Aaron J Ridley - https://github.com/aaronjridley/Balloons
-# Modified by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
-#-----------------------------------------------------------------------------
 def prediction(payload,balloon,parachute,helium,lat,lon,alt,status,queryTime,nEnsembles,errors,TESTINGtimeDiff,ARcorr,UTCdiff):
     # Define Input List
     start_time = time.time()
