@@ -50,22 +50,21 @@ def APRS(callsign_entry,aprs_apikey):
     """
     Hits the APRS API endpoint to get data for specified callsign
     """
-    # Figure out what variable type "callsign" is and convert them to appropriate type
-    callsign = ",".join(callsign_entry)
         
     # Pull data from APRS
-    json_response= requests.get("http://api.aprs.fi/api/get?name="+callsign+"&what=loc&apikey="+APRS_apikey+"&format=json")
-    if not json_response.ok:
-        return None
+    json_response= requests.get("http://api.aprs.fi/api/get?name="+callsign+"&what=loc&apikey="+aprs_apikey+"&format=json")
     aprs_dict = json.loads(json_response.text) 
-    
+    return aprs_dict
     latest_time = 0
-    for callsign_instance in aprs_dict['entries']:
-        last_time = int(callsign_instance['lasttime'])
-        if (last_time > latest_time):
-            lastest_time = last_time
-            best_callsign = callsign_instance
-    aprs_data = best_callsign
+    try:
+        for callsign_instance in aprs_dict['entries']:
+            last_time = int(callsign_instance['lasttime'])
+            if (last_time > latest_time):
+                lastest_time = last_time
+                best_callsign = callsign_instance
+        aprs_data = best_callsign
+    except KeyError:
+        return None
         
     return aprs_data
 
