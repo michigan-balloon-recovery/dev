@@ -50,11 +50,14 @@ def APRS(callsign_entry,aprs_apikey):
     """
     Hits the APRS API endpoint to get data for specified callsign
     """
-        
+    if (isinstance(callsign_entry,str) == True):
+        callsign = callsign_entry
+    if (isinstance(callsign_entry,list) == True):
+        callsign = ",".join(callsign_entry)   
+
     # Pull data from APRS
     json_response= requests.get("http://api.aprs.fi/api/get?name="+callsign+"&what=loc&apikey="+aprs_apikey+"&format=json")
     aprs_dict = json.loads(json_response.text) 
-    return aprs_dict
     latest_time = 0
     try:
         for callsign_instance in aprs_dict['entries']:
