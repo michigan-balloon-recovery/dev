@@ -17,24 +17,6 @@ api = Client(url, username=username, password=apiKey)
 
 api.service.SetMaximumResultSize(200)
 
-def get_inflight_data(latitude, longitude, altitude_feet, delta_miles, delta_feet):
-    delta_degrees = delta_miles/69.0
-    min_lat = str(latitude - delta_degrees)
-    max_lat = str(latitude + delta_degrees)
-    min_long = str(longitude - delta_degrees)
-    max_long = str(longitude + delta_degrees)
-    min_alt = str((altitude_feet - delta_feet)/100)
-    max_alt = str((altitude_feet + delta_feet)/100)
-
-
-    search_string = "{range lat " + min_lat + " " + max_lat + "} {range lon "\
-    + min_long + " " + max_long + "} {< alt " + max_alt + "} {> alt " + min_alt\
-    + "}"
-
-    print search_string
-    result = api.service.SearchBirdseyeInFlight(search_string, 15, 0)
-    return  result
-
 def package(dataset, file_ID):
     print('starting historical dataset packaging')
     f = open(file_ID, 'w')
