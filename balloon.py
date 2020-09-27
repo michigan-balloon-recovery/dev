@@ -55,6 +55,8 @@ def APRS(callsign_entry,aprs_apikey):
         
     # Pull data from APRS
     json_response= requests.get("http://api.aprs.fi/api/get?name="+callsign+"&what=loc&apikey="+APRS_apikey+"&format=json")
+    if not json_response.ok:
+        return None
     aprs_dict = json.loads(json_response.text) 
     
     latest_time = 0
