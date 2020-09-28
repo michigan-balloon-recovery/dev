@@ -50,9 +50,9 @@ def APRS(callsign_entry,aprs_apikey):
     """
     Hits the APRS API endpoint to get data for specified callsign
     """
-    if (isinstance(callsign_entry,str) == True):
+    if isinstance(callsign_entry,str):
         callsign = callsign_entry
-    if (isinstance(callsign_entry,list) == True):
+    if isinstance(callsign_entry,list):
         callsign = ",".join(callsign_entry)   
 
     # Pull data from APRS
@@ -80,9 +80,6 @@ def send_slack(message_string,message_type,recipient,slack_url):
    
     if message_type == 'dm':
         message_type = "message"
-        
-    if message_type == 'channel':
-        message_type = "channel"
     
     curl_command = "curl -X POST --data-urlencode "
     payload_command = '"payload={\\"'+message_type+'\\": \\"'+recipient+'\\", \\"username\\": \\"' + bot_username + '\\", \\"text\\": \\"' + message_string + '\\", \\"icon_emoji\\": \\":' + icon + ':\\"}" ' + slack_url

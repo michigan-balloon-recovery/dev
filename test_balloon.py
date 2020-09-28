@@ -1,6 +1,6 @@
 from unittest import TestCase
 from unittest import mock
-from balloon import APRS
+from balloon import *
 from pprint import pprint
 
 class BalloonTest(TestCase):
@@ -65,3 +65,16 @@ class BalloonTest(TestCase):
         """
         response = APRS(callsign_entry='hello', aprs_apikey='gibberish')
         assert response == None
+
+    def test_send_slack(self):
+        """
+        Tests successful curl to send a slack dm and channel message
+        """
+        pass
+
+
+    def test_send_slack_failure(self):
+        """
+        Tests error handling in send_slack function
+        """
+        pass
