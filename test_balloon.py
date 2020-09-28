@@ -2,6 +2,7 @@ from unittest import TestCase
 from unittest import mock
 from balloon import *
 from pprint import pprint
+import subprocess
 
 class BalloonTest(TestCase):
     def test_aprs_single_callsign(self):
@@ -66,15 +67,23 @@ class BalloonTest(TestCase):
         response = APRS(callsign_entry='hello', aprs_apikey='gibberish')
         assert response == None
 
-    def test_send_slack(self):
+    
+    @mock.patch.object(subprocess, 'Popen')
+    def test_send_slack(self, mock_subproc_popen):
         """
         Tests successful curl to send a slack dm and channel message
         """
-        pass
+        process_mock = mock.Mock()
+        attrs = {'communicate.return_value': (b'ok', b'')}
+        process_mock.configure_mock(**attrs)
+        mock_subproc_popen.return_value = process_mock 
+        send_slack('test message', 'big_long_slack_url')
+        mock_subproc_popen.assert_called_with(['curl', '-X', 'POST', '--data-urlencode', "payload={'username': 'Predictions Bot', 'text': 'test message', 'icon_emoji':':ghost'}", 'big_long_slack_url'], 'dtdout=-1')
 
 
     def test_send_slack_failure(self):
         """
         Tests error handling in send_slack function
         """
-        pass
+        output = send_slack('some message', 'hi')
+        assert output == b''

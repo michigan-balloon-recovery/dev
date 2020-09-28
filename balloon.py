@@ -71,20 +71,16 @@ def APRS(callsign_entry,aprs_apikey):
         
     return aprs_data
 
-def send_slack(message_string,message_type,recipient,slack_url):
+def send_slack(message_string,slack_url):
     """
     Send slack message
     """
-    icon = "ghost"
-    bot_username = "Python Bot"
-   
-    if message_type == 'dm':
-        message_type = "message"
-    
-    curl_command = "curl -X POST --data-urlencode "
-    payload_command = '"payload={\\"'+message_type+'\\": \\"'+recipient+'\\", \\"username\\": \\"' + bot_username + '\\", \\"text\\": \\"' + message_string + '\\", \\"icon_emoji\\": \\":' + icon + ':\\"}" ' + slack_url
-    command = curl_command+payload_command
-    subprocess.run(command)
+
+    command = ['curl', '-X', 'POST', '--data-urlencode', "payload={'username': 'Predictions Bot', 'text': '"+message_string+"', 'icon_emoji':':ghost:'}", slack_url]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE)
+    output,err = process.communicate()
+    return output
+
 
 def package(dataset,prediction_id,flight_id):
     """
