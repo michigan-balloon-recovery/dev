@@ -137,4 +137,22 @@ class BalloonTest(TestCase):
         """
         Test ability to retreive multiple pickles
         """
-
+        garbage_string_1 = str(uuid.uuid4())
+        prediction_numbers = [1, 2, 3, 4, 5, 6]
+        for prediction_number in prediction_numbers:
+            package(prediction_number, prediction_number, garbage_string_1)
+        for prediction_number in prediction_numbers:
+            self.assertTrue(
+                os.path.exists(
+                    garbage_string_1 + "_" + str(prediction_number) + ".pickle"
+                )
+            )
+        data_return = unpackage_group(garbage_string_1, 5)
+        for prediction_number in prediction_numbers:
+            os.remove(garbage_string_1 + "_" + str(prediction_number) + ".pickle")
+            self.assertFalse(
+                os.path.exists(
+                    garbage_string_1 + "_" + str(prediction_number) + ".pickle"
+                )
+            )
+        self.assertEqual(data_return, {"1": 1, "2": 2, "3": 3, "4": 4, "5": 5})
