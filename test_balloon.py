@@ -1,7 +1,11 @@
 from unittest import TestCase
 from unittest import mock
-from balloon import APRS
+from balloon import *
 from pprint import pprint
+import subprocess
+import uuid
+import os
+import pickle
 
 
 class BalloonTest(TestCase):
@@ -67,3 +71,88 @@ class BalloonTest(TestCase):
         """
         response = APRS(callsign_entry="hello", aprs_apikey="gibberish")
         assert response == None
+
+    @mock.patch("requests.post")
+    def test_send_slack(self, mock_post):
+        """
+        Tests successful curl to send a slack dm and channel message
+        """
+        payload = {
+            "username": "Predictions Bot",
+            "text": "test message",
+            "icon_emoji": ":ghost:",
+        }
+        return_val = send_slack("test message", "big_long_slack_url")
+        mock_post.assert_called_with(url="big_long_slack_url", data=json.dumps(payload))
+
+    def test_send_slack_failure(self):
+        """
+        Tests error handling in send_slack function
+        """
+        with mock.patch("requests.post") as mock_request:
+            mock_request.return_value.status_code = 404
+            mock_request.return_value.text = "error"
+            output = send_slack("some message", "hi")
+        self.assertFalse(output)
+        output = send_slack("some message", "hi")
+        self.assertFalse(output)
+
+    def test_package(self):
+        """
+        Tests ability to pickle
+        """
+        garbage_string_1 = str(uuid.uuid4())
+        garbage_string_2 = str(uuid.uuid4())
+        dataset = "hellothere"
+        package(dataset, garbage_string_1, garbage_string_2)
+        self.assertTrue(
+            os.path.exists(garbage_string_2 + "_" + garbage_string_1 + ".pickle")
+        )
+        pickle_in = open(garbage_string_2 + "_" + garbage_string_1 + ".pickle", "rb")
+        dataset_result = pickle.load(pickle_in)
+        self.assertEqual(dataset, dataset_result)
+        os.remove(garbage_string_2 + "_" + garbage_string_1 + ".pickle")
+        self.assertFalse(
+            os.path.exists(garbage_string_2 + "_" + garbage_string_1 + ".pickle")
+        )
+
+    def test_unpackage(self):
+        """
+        Tests ability to retrieve pickle
+        """
+        garbage_string_1 = str(uuid.uuid4())
+        garbage_string_2 = str(uuid.uuid4())
+        dataset = "letsgoblue"
+        pickle_out = open(garbage_string_2 + "_" + garbage_string_1 + ".pickle", "wb")
+        pickle.dump(dataset, pickle_out)
+        pickle_out.close()
+        dataset_result = unpackage(garbage_string_1, garbage_string_2)
+        self.assertEqual(dataset, dataset_result)
+        os.remove(garbage_string_2 + "_" + garbage_string_1 + ".pickle")
+        self.assertFalse(
+            os.path.exists(garbage_string_2 + "_" + garbage_string_1 + ".pickle")
+        )
+
+    def test_unpackage_group(self):
+        """
+        Test ability to retreive multiple pickles
+        """
+        garbage_string_1 = str(uuid.uuid4())
+        prediction_numbers = [1, 2, 3, 4, 5, 6]
+        for prediction_number in prediction_numbers:
+            package(prediction_number, prediction_number, garbage_string_1)
+        for prediction_number in prediction_numbers:
+            self.assertTrue(
+                os.path.exists(
+                    garbage_string_1 + "_" + str(prediction_number) + ".pickle"
+                )
+            )
+        data_return = unpackage_group(garbage_string_1, 5)
+        for prediction_number in prediction_numbers:
+            os.remove(garbage_string_1 + "_" + str(prediction_number) + ".pickle")
+            self.assertFalse(
+                os.path.exists(
+                    garbage_string_1 + "_" + str(prediction_number) + ".pickle"
+                )
+            )
+        self.assertEqual(data_return, {"1": 1, "2": 2, "3": 3, "4": 4, "5": 5})

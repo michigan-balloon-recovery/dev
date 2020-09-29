@@ -51,9 +51,9 @@ def APRS(callsign_entry, aprs_apikey):
     """
     Hits the APRS API endpoint to get data for specified callsign
     """
-    if isinstance(callsign_entry, str) == True:
+    if isinstance(callsign_entry, str):
         callsign = callsign_entry
-    if isinstance(callsign_entry, list) == True:
+    if isinstance(callsign_entry, list):
         callsign = ",".join(callsign_entry)
 
     # Pull data from APRS
@@ -79,36 +79,20 @@ def APRS(callsign_entry, aprs_apikey):
     return aprs_data
 
 
-def send_slack(message_string, message_type, recipient, slack_url):
+def send_slack(message_string, slack_url):
     """
     Send slack message
     """
-    icon = "ghost"
-    bot_username = "Python Bot"
-
-    if message_type == "dm":
-        message_type = "message"
-
-    if message_type == "channel":
-        message_type = "channel"
-
-    curl_command = "curl -X POST --data-urlencode "
-    payload_command = (
-        '"payload={\\"'
-        + message_type
-        + '\\": \\"'
-        + recipient
-        + '\\", \\"username\\": \\"'
-        + bot_username
-        + '\\", \\"text\\": \\"'
-        + message_string
-        + '\\", \\"icon_emoji\\": \\":'
-        + icon
-        + ':\\"}" '
-        + slack_url
-    )
-    command = curl_command + payload_command
-    subprocess.run(command)
+    payload = {
+        "username": "Predictions Bot",
+        "text": message_string,
+        "icon_emoji": ":ghost:",
+    }
+    try:
+        response = requests.post(url=slack_url, data=json.dumps(payload))
+        return response.status_code == requests.codes.ok
+    except requests.exceptions.MissingSchema:
+        return False
 
 
 def package(dataset, prediction_id, flight_id):
@@ -135,8 +119,11 @@ def unpackage_group(flight_id, num_predictions):
     """
     all_predictions = dict()
     for prediction_id in range(1, num_predictions + 1):
-        data = unpackage(prediction_id, flight_id)
-        all_predictions[str(prediction_id)] = data
+        try:
+            data = unpackage(prediction_id, flight_id)
+            all_predictions[str(prediction_id)] = data
+        except Exception:
+            pass
     return all_predictions
 
 
