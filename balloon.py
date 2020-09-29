@@ -5,25 +5,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import mpl_toolkits.mplot3d.axes3d as p3
-import sys
 import random
 import time
 import pandas
 import json
 import requests
 import pickle
-import math
 import gmplot 
-import statistics
 import pandas as pd
 import subprocess
-from math import sin, cos, sqrt, atan2, radians
-
-from mpl_toolkits.mplot3d import Axes3D
 
 import plotly
 import plotly.graph_objs as go
-import plotly.express as px
 
 
 #-----------------------------------------------------------------------------
@@ -69,17 +62,13 @@ def send_slack(message_string,message_type,recipient,slack_url):
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
 def package(dataset,prediction_id,flight_id):
-    pickle_out = open(flight_id+'_'+str(prediction_id)+".pickle","wb")
-    pickle.dump(dataset, pickle_out)
-    pickle_out.close()
+    pickle.dump(dataset, open(flight_id+'_'+str(prediction_id)+".pkl","wb"))
     
 #-----------------------------------------------------------------------------
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
 def unpackage(prediction_id,flight_id):
-    pickle_in = open(flight_id+'_'+str(prediction_id)+".pickle","rb")
-    dataset = pickle.load(pickle_in)
-    return dataset
+    return pickle.load(open(flight_id+'_'+str(prediction_id)+".pkl","rb"))
 
 #-----------------------------------------------------------------------------
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
@@ -88,7 +77,7 @@ def unpackage_group(flight_id,num_predictions):
     all_predictions = dict()
     for prediction_id in range(1,num_predictions+1):
         data = unpackage(prediction_id,flight_id)
-        all_predictions[str(prediction_id)] = data
+        all_predictions[prediction_id] = data
     return all_predictions
 
 #----------------------------------------------------------------------------- 
@@ -105,7 +94,7 @@ def launch_prediction(payload,balloon,parachute,helium,lat,lon,launch_time,toler
     new_lat = lat + delta_lat
     new_lon = lon + delta_lon    
     
-    degrees_to_radians = math.pi/180.0
+    degrees_to_radians = np.pi/180.0
     
     while True:
         data = prediction(payload,balloon,parachute,helium,new_lat,new_lon,-1,1,launch_time,-1,0.1,0,-1,utc_diff)
@@ -118,8 +107,8 @@ def launch_prediction(payload,balloon,parachute,helium,lat,lon,launch_time,toler
         theta1 = lon*degrees_to_radians
         theta2 = data['Landing Lon']*degrees_to_radians
                
-        cos = (math.sin(phi1)*math.sin(phi2)*math.cos(theta1 - theta2) + math.cos(phi1)*math.cos(phi2))
-        arc = math.acos(cos)
+        cos = (np.sin(phi1)*np.sin(phi2)*np.cos(theta1 - theta2) + np.cos(phi1)*np.cos(phi2))
+        arc = np.arccos(cos)
         distance = arc*3958.8*5280
         
         if distance <= tolerance:
@@ -141,21 +130,21 @@ def launch_prediction(payload,balloon,parachute,helium,lat,lon,launch_time,toler
 #-----------------------------------------------------------------------------
 # Written by members of Michigan Balloon Recovery and Satellite Testbed at the University of Michigan
 #-----------------------------------------------------------------------------
-def coord_shift(lat_1,lon_1,lat_2,lon_2):
+def gc_dist(lat_1,lon_1,lat_2,lon_2):
     
     # approximate radius of earth in km
     R = 6373.0
     
-    lat_1 = radians(lat_1)
-    lon_1 = radians(lon_1)
-    lat_2 = radians(lat_2)
-    lon_2 = radians(lon_2)
+    lat_1 = np.radians(lat_1)
+    lon_1 = np.radians(lon_1)
+    lat_2 = np.radians(lat_2)
+    lon_2 = np.radians(lon_2)
     
     d_lon = lon_2 - lon_1
     d_lat = lat_2 - lat_1
     
-    a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
-    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    a = np.sin(d_lat / 2)**2 + np.cos(lat_1) * np.cos(lat_2) * np.sin(d_lon / 2)**2
+    c = 2 * np.arctan(np.sqrt(a) / np.sqrt(1 - a))
     
     distance = R * c * 3280.84
     
@@ -248,7 +237,7 @@ def heatMap(data,apikey):
     lon_list = list(data['Landing Deviations']['Lon'])   
     lats = np.array([data['Inputs']['Lat'],data['Landing Lat']])
     lons = np.array([data['Inputs']['Lon'],data['Landing Lon']])
-    gmap = gmplot.GoogleMapPlotter(statistics.mean(lats),statistics.mean(lons),9)
+    gmap = gmplot.GoogleMapPlotter(np.mean(lats),np.mean(lons),9)
     gmap.heatmap(lat_list,lon_list) 
     gmap.plot(lats,lons)
     gmap.apikey = apikey
@@ -283,7 +272,7 @@ def plotFlight(flightID,predTotal,predLow,predHigh,plotEnsem,plotType):
       
     # Iterate through predictions
     for prediction in AllData:
-        ID = str(AllData[prediction]['Inputs']['Status']) + ',' + str(math.trunc(AllData[prediction]['Inputs']['Altitude']))
+        ID = str(AllData[prediction]['Inputs']['Status']) + ',' + str(np.trunc(AllData[prediction]['Inputs']['Altitude']))
         
         # Get actual flight path
         lat.append(AllData[prediction]['Inputs']['Lat'])
@@ -294,13 +283,13 @@ def plotFlight(flightID,predTotal,predLow,predHigh,plotEnsem,plotType):
         # Plot nominal prediction data
         if predLow < int(prediction) < predHigh:  
             if plotType == '3':
-                traceNom = go.Scatter3d(x = AllData[prediction]['TimeData']['Latitude'],y = AllData[prediction]['TimeData']['Longitude'],z = AllData[prediction]['TimeData']['Altitude'],mode='lines', line=dict(color='blue',width=1),name = str(AllData[prediction]['Inputs']['Status']) + ',' + str(math.trunc(AllData[prediction]['Inputs']['Altitude'])))
+                traceNom = go.Scatter3d(x = AllData[prediction]['TimeData']['Latitude'],y = AllData[prediction]['TimeData']['Longitude'],z = AllData[prediction]['TimeData']['Altitude'],mode='lines', line=dict(color='blue',width=1),name = str(AllData[prediction]['Inputs']['Status']) + ',' + str(np.trunc(AllData[prediction]['Inputs']['Altitude'])))
                 data.append(traceNom)
             if plotType == '2A':
-                traceNom = go.Scatter(x = AllData[prediction]['TimeData']['Altitude'].index,y = AllData[prediction]['TimeData']['Altitude'],mode='lines', line=dict(color='blue',width=1),name = str(AllData[prediction]['Inputs']['Status']) + ',' + str(math.trunc(AllData[prediction]['Inputs']['Altitude'])))
+                traceNom = go.Scatter(x = AllData[prediction]['TimeData']['Altitude'].index,y = AllData[prediction]['TimeData']['Altitude'],mode='lines', line=dict(color='blue',width=1),name = str(AllData[prediction]['Inputs']['Status']) + ',' + str(np.trunc(AllData[prediction]['Inputs']['Altitude'])))
                 data.append(traceNom)
             if plotType == '2L':
-                traceNom = go.Scatter(x = AllData[prediction]['TimeData']['Longitude'],y = AllData[prediction]['TimeData']['Latitude'],mode='lines', line=dict(color='blue',width=1),name = str(AllData[prediction]['Inputs']['Status']) + ',' + str(math.trunc(AllData[prediction]['Inputs']['Altitude'])))
+                traceNom = go.Scatter(x = AllData[prediction]['TimeData']['Longitude'],y = AllData[prediction]['TimeData']['Latitude'],mode='lines', line=dict(color='blue',width=1),name = str(AllData[prediction]['Inputs']['Status']) + ',' + str(np.trunc(AllData[prediction]['Inputs']['Altitude'])))
                 data.append(traceNom)            
         
         
@@ -628,7 +617,7 @@ def get_station(longitude, latitude):
     # At this point, we found the closest station in the united states, and the distance is saved in MinDist
 
     # If that distance (MinDist) is still too large
-    if (MinDist > math.sqrt(500)):
+    if (MinDist > np.sqrt(500)):
         stationDataWorld = pd.read_csv(os.getcwd()+'\\StationListWorld.txt',delimiter=' ',header=None)
         stationDataWorld[10] = ((stationDataWorld[3]-latitude)**2+(stationDataWorld[6]-longitude)**2)**0.5
         MinDistIndex = stationDataWorld[10].idxmin()
@@ -1176,7 +1165,7 @@ def prediction(payload,balloon,parachute,helium,lat,lon,alt,status,queryTime,nEn
                 secLon = list()
                 secAlt = list()
                 
-                #secLat=secLon=secAlt = np.full(int(math.floor(numPoints*1.2)), np.nan)
+                #secLat=secLon=secAlt = np.full(int(np.floor(numPoints*1.2)), np.nan)
     
                 longitude = AscentLongitude[0]
                 latitude = AscentLatitude[0]
