@@ -51,10 +51,10 @@ def APRS(callsign_entry, aprs_apikey):
     """
     Hits the APRS API endpoint to get data for specified callsign
     """
-    if isinstance(callsign_entry,str):
+    if isinstance(callsign_entry, str):
         callsign = callsign_entry
-    if isinstance(callsign_entry,list):
-        callsign = ",".join(callsign_entry)   
+    if isinstance(callsign_entry, list):
+        callsign = ",".join(callsign_entry)
 
     # Pull data from APRS
     json_response = requests.get(
@@ -78,15 +78,21 @@ def APRS(callsign_entry, aprs_apikey):
 
     return aprs_data
 
-def send_slack(message_string,slack_url):
+
+def send_slack(message_string, slack_url):
     """
     Send slack message
     """
-
-    command = ['curl', '-X', 'POST', '--data-urlencode', "payload={'username': 'Predictions Bot', 'text': '"+message_string+"', 'icon_emoji':':ghost:'}", slack_url]
-    process = subprocess.Popen(command, stdout=subprocess.PIPE)
-    output,err = process.communicate()
-    return output
+    payload = {
+        "username": "Predictions Bot",
+        "text": message_string,
+        "icon_emoji": ":ghost:",
+    }
+    try:
+        response = requests.post(url=slack_url, data=json.dumps(payload))
+        return response.status_code == requests.codes.ok
+    except requests.exceptions.MissingSchema:
+        return False
 
 
 def package(dataset, prediction_id, flight_id):

@@ -69,23 +69,27 @@ class BalloonTest(TestCase):
         response = APRS(callsign_entry="hello", aprs_apikey="gibberish")
         assert response == None
 
-    
-    @mock.patch.object(subprocess, 'Popen')
-    def test_send_slack(self, mock_subproc_popen):
+    @mock.patch("requests.post")
+    def test_send_slack(self, mock_post):
         """
         Tests successful curl to send a slack dm and channel message
         """
-        process_mock = mock.Mock()
-        attrs = {'communicate.return_value': (b'ok', b'')}
-        process_mock.configure_mock(**attrs)
-        mock_subproc_popen.return_value = process_mock 
-        send_slack('test message', 'big_long_slack_url')
-        mock_subproc_popen.assert_called_with(['curl', '-X', 'POST', '--data-urlencode', "payload={'username': 'Predictions Bot', 'text': 'test message', 'icon_emoji':':ghost'}", 'big_long_slack_url'], 'dtdout=-1')
-
+        payload = {
+            "username": "Predictions Bot",
+            "text": "test message",
+            "icon_emoji": ":ghost:",
+        }
+        return_val = send_slack("test message", "big_long_slack_url")
+        mock_post.assert_called_with(url="big_long_slack_url", data=json.dumps(payload))
 
     def test_send_slack_failure(self):
         """
         Tests error handling in send_slack function
         """
-        output = send_slack('some message', 'hi')
-        assert output == b''
+        with mock.patch("requests.post") as mock_request:
+            mock_request.return_value.status_code = 404
+            mock_request.return_value.text = "error"
+            output = send_slack("some message", "hi")
+        self.assertFalse(output)
+        output = send_slack("some message", "hi")
+        self.assertFalse(output)
