@@ -11,7 +11,7 @@ import pandas
 import json
 import requests
 import pickle
-import gmplot 
+import gmplot
 import pandas as pd
 import subprocess
 
@@ -71,6 +71,7 @@ def APRS(callsign_entry, aprs_apikey):
 
     return aprs_data
 
+
 def send_slack(message_string, slack_url):
     """
     Send slack message
@@ -91,14 +92,14 @@ def package(dataset, prediction_id, flight_id):
     """
     Helper function to pickle/package data
     """
-    pickle.dump(dataset, open(flight_id+'_'+str(prediction_id)+".pkl","wb"))
+    pickle.dump(dataset, open(flight_id + "_" + str(prediction_id) + ".pkl", "wb"))
 
 
 def unpackage(prediction_id, flight_id):
     """
     Helper function to unpickle/unpackage data
     """
-    return pickle.load(open(flight_id+'_'+str(prediction_id)+".pkl","rb"))
+    return pickle.load(open(flight_id + "_" + str(prediction_id) + ".pkl", "rb"))
 
 
 def unpackage_group(flight_id, num_predictions):
@@ -150,10 +151,10 @@ def launch_prediction(
     delta_lon = lon - data["Landing Lon"]
 
     new_lat = lat + delta_lat
-    new_lon = lon + delta_lon    
-    
-    degrees_to_radians = np.pi/180.0
-    
+    new_lon = lon + delta_lon
+
+    degrees_to_radians = np.pi / 180.0
+
     while True:
         data = prediction(
             payload,
@@ -177,13 +178,15 @@ def launch_prediction(
         phi2 = (90.0 - data["Landing Lat"]) * degrees_to_radians
 
         # theta = longitude
-        theta1 = lon*degrees_to_radians
-        theta2 = data['Landing Lon']*degrees_to_radians
-               
-        cos = (np.sin(phi1)*np.sin(phi2)*np.cos(theta1 - theta2) + np.cos(phi1)*np.cos(phi2))
+        theta1 = lon * degrees_to_radians
+        theta2 = data["Landing Lon"] * degrees_to_radians
+
+        cos = np.sin(phi1) * np.sin(phi2) * np.cos(theta1 - theta2) + np.cos(
+            phi1
+        ) * np.cos(phi2)
         arc = np.arccos(cos)
-        distance = arc*3958.8*5280
-        
+        distance = arc * 3958.8 * 5280
+
         if distance <= tolerance:
             break
 
@@ -200,22 +203,23 @@ def launch_prediction(
     launch_loc["Tolerace"] = distance
     return launch_loc
 
-def gc_dist(lat_1,lon_1,lat_2,lon_2):
-    
+
+def gc_dist(lat_1, lon_1, lat_2, lon_2):
+
     # approximate radius of earth in km
     R = 6373.0
-    
+
     lat_1 = np.radians(lat_1)
     lon_1 = np.radians(lon_1)
     lat_2 = np.radians(lat_2)
     lon_2 = np.radians(lon_2)
-    
+
     d_lon = lon_2 - lon_1
     d_lat = lat_2 - lat_1
-    
-    a = np.sin(d_lat / 2)**2 + np.cos(lat_1) * np.cos(lat_2) * np.sin(d_lon / 2)**2
+
+    a = np.sin(d_lat / 2) ** 2 + np.cos(lat_1) * np.cos(lat_2) * np.sin(d_lon / 2) ** 2
     c = 2 * np.arctan(np.sqrt(a) / np.sqrt(1 - a))
-    
+
     distance = R * c * 3280.84
 
     return distance
@@ -1366,9 +1370,9 @@ def prediction(
                 secLat = list()
                 secLon = list()
                 secAlt = list()
-                
-                #secLat=secLon=secAlt = np.full(int(np.floor(numPoints*1.2)), np.nan)
-    
+
+                # secLat=secLon=secAlt = np.full(int(np.floor(numPoints*1.2)), np.nan)
+
                 longitude = AscentLongitude[0]
                 latitude = AscentLatitude[0]
                 altitude = AscentAltitude[0]

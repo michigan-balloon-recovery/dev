@@ -26,7 +26,7 @@ doDrivingCalc = True
 
 
 # Do backwards prediction calculation
-launchLoc = balloon.launchPrediction(
+launchLoc = balloon.launch_prediction(
     payload,
     balloonWeight,
     parachuteDia,

@@ -1,11 +1,12 @@
 from unittest import TestCase
 from unittest import mock
-from balloon import *
 from pprint import pprint
 import subprocess
 import uuid
 import os
 import pickle
+import json
+from balloon import APRS, send_slack, package, unpackage, unpackage_group
 
 
 class BalloonTest(TestCase):

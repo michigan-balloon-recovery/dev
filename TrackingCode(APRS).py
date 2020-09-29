@@ -118,9 +118,7 @@ while tracking == True:
                                 + str(((LastAPRSCheck - lastPacketTime) / 60))
                                 + " minutes."
                             )
-                            balloon.send_slack(
-                                message, messageType, recipient, slackURL
-                            )
+                            balloon.send_slack(message, slackURL)
                             warned = 1
 
                         # If last position report was more than (UpperFreqToleraceTerm*60) seconds ago and we have already been warned
@@ -129,18 +127,14 @@ while tracking == True:
                             > (UpperFreqToleraceTerm * 60)
                         ) and warned == 1:
                             message = "Error: Tracker malfunction."
-                            balloon.send_slack(
-                                message, messageType, recipient, slackURL
-                            )
+                            balloon.send_slack(message, slackURL)
                             print("break")
                             break
 
                         # Check if location is reporting same position twice - If so send message to group
                         if APRS_data["lasttime"] != APRS_data["time"]:
                             message = "Warning: Tracker may have lost GPS signal. Data transmission remains nominal."
-                            balloon.send_slack(
-                                message, messageType, recipient, slackURL
-                            )
+                            balloon.send_slack(message, slackURL)
             except:
                 CycleError = True
                 ErrorCode = 3
@@ -167,7 +161,7 @@ while tracking == True:
                     # Send message to slack that modification was made
                     if AS_adjust_notif == 0:
                         message = "Adjusted atmospheric model based on recorded flight dynamics"
-                        balloon.send_slack(message, messageType, recipient, slackURL)
+                        balloon.send_slack(message, slackURL)
                         AS_adjust_notif = 1
                 else:
                     ARcorr = -1
@@ -213,7 +207,7 @@ while tracking == True:
             try:
                 # If more than one predction exists, figure out if it has shifted by a certain tolerace since the last NOTIFICATION
                 if len(predLat) > 1:
-                    deviation = balloon.coordShift(
+                    deviation = balloon.coord_shift(
                         predLat[-1], predLon[-1], lastNotLat, lastNotLon
                     )
                     print("Deviation: " + str(deviation) + " ft")
@@ -234,7 +228,7 @@ while tracking == True:
                         + str(data["Landing Lon"])
                         + "&travelmode=driving"
                     )
-                    balloon.send_slack(message, messageType, recipient, slackURL)
+                    balloon.send_slack(message, slackURL)
                     print("New coord reference")
                     lastNotLat = data["Landing Lat"]
                     lastNotLon = data["Landing Lon"]
@@ -252,7 +246,7 @@ while tracking == True:
                         + str(data["Landing Lon"])
                         + "&travelmode=driving"
                     )
-                    balloon.send_slack(message, messageType, recipient, slackURL)
+                    balloon.send_slack(message, slackURL)
                     print("New coord reference")
                     lastNotLat = data["Landing Lat"]
                     lastNotLon = data["Landing Lon"]
@@ -279,7 +273,7 @@ while tracking == True:
                         + str(data["Landing Lon"])
                         + "&travelmode=driving"
                     )
-                    balloon.send_slack(message, messageType, recipient, slackURL)
+                    balloon.send_slack(message, slackURL)
                     print("Program Shutdown")
                     break
             except:
@@ -293,11 +287,11 @@ while tracking == True:
             # First time error happens, send a message
             if errorNum == 1:
                 message = "ALERT: Error #" + str(ErrorCode) + ". Attempting to fix..."
-                balloon.send_slack(message, messageType, recipient, slackURL)
+                balloon.send_slack(message, slackURL)
                 time.sleep(10)
             if errorNum > 5:
                 message = "ALERT: Could not fix error. Program shutdown."
-                balloon.send_slack(message, messageType, recipient, slackURL)
+                balloon.send_slack(message, slackURL)
                 print("break")
                 break
 
@@ -308,4 +302,4 @@ while tracking == True:
 
 
 message = "Data saved, program shutdown"
-balloon.send_slack(message, messageType, recipient, slackURL)
+balloon.send_slack(message, slackURL)

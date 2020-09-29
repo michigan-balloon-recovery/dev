@@ -40,9 +40,7 @@ def get_preflight_data(
     time_window_min = date_time_epoch - time_delta_seconds
     time_window_max = date_time_epoch + time_delta_seconds
     if condition:
-        raise InvalidTimeWindow(
-            "Runtime must be before launch window center minus time delta"
-        )
+        raise Exception("Runtime must be before launch window center minus time delta")
     delta_miles = (28 / 3) * time_delta_minutes
     delta_degrees = delta_miles / 69.0
     min_lat = str(latitude - delta_degrees)
