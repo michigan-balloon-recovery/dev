@@ -119,8 +119,11 @@ def unpackage_group(flight_id, num_predictions):
     """
     all_predictions = dict()
     for prediction_id in range(1, num_predictions + 1):
-        data = unpackage(prediction_id, flight_id)
-        all_predictions[str(prediction_id)] = data
+        try:
+            data = unpackage(prediction_id, flight_id)
+            all_predictions[str(prediction_id)] = data
+        except Exception:
+            pass
     return all_predictions
 
 

@@ -3,6 +3,9 @@ from unittest import mock
 from balloon import *
 from pprint import pprint
 import subprocess
+import uuid
+import os
+import pickle
 
 
 class BalloonTest(TestCase):
@@ -93,3 +96,45 @@ class BalloonTest(TestCase):
         self.assertFalse(output)
         output = send_slack("some message", "hi")
         self.assertFalse(output)
+
+    def test_package(self):
+        """
+        Tests ability to pickle
+        """
+        garbage_string_1 = str(uuid.uuid4())
+        garbage_string_2 = str(uuid.uuid4())
+        dataset = "hellothere"
+        package(dataset, garbage_string_1, garbage_string_2)
+        self.assertTrue(
+            os.path.exists(garbage_string_2 + "_" + garbage_string_1 + ".pickle")
+        )
+        pickle_in = open(garbage_string_2 + "_" + garbage_string_1 + ".pickle", "rb")
+        dataset_result = pickle.load(pickle_in)
+        self.assertEqual(dataset, dataset_result)
+        os.remove(garbage_string_2 + "_" + garbage_string_1 + ".pickle")
+        self.assertFalse(
+            os.path.exists(garbage_string_2 + "_" + garbage_string_1 + ".pickle")
+        )
+
+    def test_unpackage(self):
+        """
+        Tests ability to retrieve pickle
+        """
+        garbage_string_1 = str(uuid.uuid4())
+        garbage_string_2 = str(uuid.uuid4())
+        dataset = "letsgoblue"
+        pickle_out = open(garbage_string_2 + "_" + garbage_string_1 + ".pickle", "wb")
+        pickle.dump(dataset, pickle_out)
+        pickle_out.close()
+        dataset_result = unpackage(garbage_string_1, garbage_string_2)
+        self.assertEqual(dataset, dataset_result)
+        os.remove(garbage_string_2 + "_" + garbage_string_1 + ".pickle")
+        self.assertFalse(
+            os.path.exists(garbage_string_2 + "_" + garbage_string_1 + ".pickle")
+        )
+
+    def test_unpackage_group(self):
+        """
+        Test ability to retreive multiple pickles
+        """
+
